@@ -8,7 +8,6 @@ import {
   Delete,
   ParseUUIDPipe,
   Query,
-  HttpCode,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -17,7 +16,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { FindAllQueryDto } from './dto/find-all-query.dto';
 import { AuthGuard } from '../common/guards/auth.guard';
 
-@Controller('users')
+@Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
