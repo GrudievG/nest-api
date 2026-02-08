@@ -46,7 +46,7 @@ export class UsersController {
 
   @UseGuards(AuthGuard)
   @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    this.usersService.remove(id);
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.remove(id);
   }
 }
