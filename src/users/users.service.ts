@@ -6,51 +6,53 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+  ) {}
   private readonly users = new Map<string, User>();
 
-  create(createUserDto: CreateUserDto) {
-    const users = Array.from(this.users.values());
+  async create(createUserDto: CreateUserDto) {
+    const existing = await this.usersRepository.findOne({
+      where: { email: createUserDto.email },
+    });
 
-    const isExists = users.some((u) => u.email === createUserDto.email);
-    if (isExists) {
+    if (existing) {
       throw new ConflictException('User already exists');
     }
 
-    const now = new Date().toISOString();
-    const user: User = {
-      id: crypto.randomUUID(),
-      ...createUserDto,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.users.set(user.id, user);
-
-    return user;
+    const user = this.usersRepository.create(createUserDto);
+    return this.usersRepository.save(user);
   }
 
-  findAll(
+  // TODO: Implement pagination
+  async findAll(
     offset: number,
     limit: number,
-  ): {
+  ): Promise<{
     items: User[];
     offset: number;
     limit: number;
     total: number;
-  } {
+  }> {
     const total = this.users.size;
-    const items = Array.from(this.users.values())
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .slice(offset, offset + limit);
+    const items = await this.usersRepository.find({
+      order: { createdAt: 'DESC' },
+      skip: offset,
+      take: limit,
+    });
 
     return { items, offset, limit, total };
   }
 
-  findOne(id: string): User {
-    const user = this.users.get(id);
+  async findOne(id: string): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -58,6 +60,7 @@ export class UsersService {
     return user;
   }
 
+  // TODO: Implement actual integration with DB
   update(id: string, updateUserDto: UpdateUserDto) {
     const user = this.users.get(id);
     if (!user) {
@@ -82,14 +85,9 @@ export class UsersService {
         patch.lastName = updateUserDto.lastName;
       }
 
-      if (updateUserDto.age !== undefined) {
-        patch.age = updateUserDto.age;
-      }
-
       const updatedUser: User = {
         ...user,
         ...patch,
-        updatedAt: new Date().toISOString(),
       };
 
       this.users.set(id, updatedUser);
@@ -97,8 +95,8 @@ export class UsersService {
     }
   }
 
-  remove(id: string): void {
-    const deleted = this.users.delete(id);
+  async remove(id: string): Promise<void> {
+    const deleted = await this.usersRepository.delete(id);
 
     if (!deleted) {
       throw new NotFoundException('User not found');
