@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggerInterceptor } from './common/interceptors/http-logger.interceptor';
 
@@ -9,6 +9,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     cors: true,
   });
+
+  app.setGlobalPrefix('api');
+  app.enableVersioning({ type: VersioningType.URI });
 
   app.useGlobalInterceptors(new HttpLoggerInterceptor());
   app.useGlobalPipes(
