@@ -7,4 +7,4 @@ export class ListOrdersDto {
   to?: Date;
   limit: number;
   offset: number;
-};
+}
