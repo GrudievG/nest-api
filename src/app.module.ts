@@ -19,6 +19,7 @@ import authConfig from './config/auth.config';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { TypeOrmRequestContextLogger } from './common/utils/typeorm-logger';
 import { AuthModule } from './auth/auth.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { AuthModule } from './auth/auth.module';
     ProductsModule,
     AppGraphqlModule,
     AuthModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

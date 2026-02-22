@@ -4,10 +4,12 @@ export type JwtPayload = {
   sub: string;
   email: string;
   roles: UserRole[];
+  scopes: string[];
 };
 
 export type AuthUser = {
-  userId: string;
+  sub: string;
   email: string;
   roles: UserRole[];
+  scopes: string[];
 };
