@@ -1,14 +1,19 @@
 import {
   IsEmail,
-  IsInt,
   IsNotEmpty,
   IsString,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
-export class CreateUserDto {
+export class RegisterUserDto {
   @IsEmail()
   readonly email!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72) // bcrypt limit
+  password: string;
 
   @IsString()
   @IsNotEmpty()
@@ -18,7 +23,4 @@ export class CreateUserDto {
   @IsString()
   @MinLength(2)
   readonly lastName!: string;
-
-  @IsInt()
-  readonly age: number;
 }

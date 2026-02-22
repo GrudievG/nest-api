@@ -5,6 +5,7 @@ import { AddUserEmailUniqueIndex1770499624048 } from './src/migrations/177049962
 import { AddProductTitleUniqueIndex1770500167736 } from './src/migrations/1770500167736-AddProductTitleUniqueIndex';
 import { AddStockCheck1770569086913 } from './src/migrations/1770569086913-AddStockCheck';
 import { AddOrderIndexes1770576093077 } from './src/migrations/1770576093077-AddOrderIndexes';
+import { AddUserPasswordHash1771603078887 } from './src/migrations/1771603078887-AddUserPasswordHash';
 
 const appDataSource = new DataSource({
   type: 'postgres',
@@ -20,6 +21,7 @@ const appDataSource = new DataSource({
     AddProductTitleUniqueIndex1770500167736,
     AddStockCheck1770569086913,
     AddOrderIndexes1770576093077,
+    AddUserPasswordHash1771603078887,
   ],
   synchronize: false,
 });

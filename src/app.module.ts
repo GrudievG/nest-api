@@ -15,15 +15,17 @@ import { ProductsModule } from './products/products.module';
 import { AppGraphqlModule } from './graphql/graphql.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
+import authConfig from './config/auth.config';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { TypeOrmRequestContextLogger } from './common/utils/typeorm-logger';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       skipProcessEnv: true,
-      load: [appConfig, databaseConfig],
+      load: [appConfig, databaseConfig, authConfig],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -45,6 +47,7 @@ import { TypeOrmRequestContextLogger } from './common/utils/typeorm-logger';
     OrdersModule,
     ProductsModule,
     AppGraphqlModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
