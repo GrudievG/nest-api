@@ -163,7 +163,7 @@ export class OrdersService {
     }
   }
 
-  async listOrders(input: ListOrdersDto): Promise<Order[]> {
+  async getList(input: ListOrdersDto): Promise<Order[]> {
     const qb = this.ordersRepository
       .createQueryBuilder('orders')
       .leftJoinAndSelect('orders.items', 'items')
@@ -190,5 +190,10 @@ export class OrdersService {
     }
 
     return qb.getMany();
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.ordersRepository.delete({ id });
+    return (result.affected ?? 0) > 0;
   }
 }
