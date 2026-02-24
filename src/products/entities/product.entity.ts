@@ -4,11 +4,14 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import type { OrderItem } from '../../orders/entities/order-item.entity';
+import { FileRecord } from '../../files/file-record.entity';
 
 @Entity('products')
 @Check('CHK_products_stock_non_negative', `"stock" >= 0`)
@@ -25,6 +28,13 @@ export class Product {
 
   @Column({ type: 'boolean', name: 'is_active', default: true })
   isActive: boolean;
+
+  @Column({ type: 'uuid', name: 'main_image_file_id', nullable: true })
+  mainImageFileId: string | null;
+
+  @ManyToOne(() => FileRecord, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'main_image_file_id' })
+  mainImageFile: FileRecord | null;
 
   @Column({ type: 'int', default: 0 })
   stock: number;

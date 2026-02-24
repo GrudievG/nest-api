@@ -7,6 +7,8 @@ import { AddStockCheck1770569086913 } from './src/migrations/1770569086913-AddSt
 import { AddOrderIndexes1770576093077 } from './src/migrations/1770576093077-AddOrderIndexes';
 import { AddUserPasswordHash1771603078887 } from './src/migrations/1771603078887-AddUserPasswordHash';
 import { CreatePaymentEntity1771784004287 } from './src/migrations/1771784004287-CreatePaymentEntity';
+import { CreateFileRecordEntity1771948499029 } from './src/migrations/1771948499029-CreateFileRecordEntity';
+import { AddProductImageRelation1771966821516 } from './src/migrations/1771966821516-AddProductImageRelation';
 
 const appDataSource = new DataSource({
   type: 'postgres',
@@ -24,6 +26,8 @@ const appDataSource = new DataSource({
     AddOrderIndexes1770576093077,
     AddUserPasswordHash1771603078887,
     CreatePaymentEntity1771784004287,
+    CreateFileRecordEntity1771948499029,
+    AddProductImageRelation1771966821516,
   ],
   synchronize: false,
 });
