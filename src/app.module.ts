@@ -4,29 +4,31 @@ import {
   NestModule,
   RequestMethod,
 } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller';
+import appConfig from './config/app.config';
+import databaseConfig from './config/database.config';
+import authConfig from './config/auth.config';
+import awsConfig from './config/aws.config';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
+import { TypeOrmRequestContextLogger } from './common/utils/typeorm-logger';
+import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { OrdersModule } from './orders/orders.module';
 import { ProductsModule } from './products/products.module';
 import { AppGraphqlModule } from './graphql/graphql.module';
-import appConfig from './config/app.config';
-import databaseConfig from './config/database.config';
-import authConfig from './config/auth.config';
-import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
-import { TypeOrmRequestContextLogger } from './common/utils/typeorm-logger';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       skipProcessEnv: true,
-      load: [appConfig, databaseConfig, authConfig],
+      load: [appConfig, databaseConfig, authConfig, awsConfig],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -50,6 +52,7 @@ import { PaymentsModule } from './payments/payments.module';
     AppGraphqlModule,
     AuthModule,
     PaymentsModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
