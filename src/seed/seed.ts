@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { In } from 'typeorm';
 import bcrypt from 'bcrypt';
-import dataSource from '../../data-source';
+import dataSource from '../data-source';
 import { User, UserRole } from '../users/entities/user.entity';
 import { Product } from '../products/entities/product.entity';
 import { Order } from '../orders/entities/order.entity';
