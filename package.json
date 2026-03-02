@@ -18,10 +18,13 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "db:generate": "typeorm-ts-node-commonjs migration:generate -d data-source.ts",
-    "db:migrate": "typeorm-ts-node-commonjs migration:run -d data-source.ts",
-    "db:revert": "typeorm-ts-node-commonjs migration:revert -d data-source.ts",
-    "db:seed": "ts-node -r tsconfig-paths/register src/seed/seed.ts"
+    "db:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts",
+    "db:migrate": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
+    "db:migrate:prod": "node node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
+    "db:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
+    "db:revert:prod": "node node_modules/typeorm/cli.js migration:revert -d dist/data-source.js",
+    "db:seed": "ts-node -r tsconfig-paths/register src/seed/seed.ts",
+    "db:seed:prod": "node dist/seed/seed.js"
   },
   "dependencies": {
     "@apollo/server": "^5.4.0",
