@@ -1,8 +1,8 @@
-FROM node:24-alpine as base
+FROM node:24-alpine AS base
 WORKDIR /usr/src/app
 
 
-FROM base as deps
+FROM base AS deps
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
@@ -15,7 +15,6 @@ COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY . .
 
 EXPOSE 3000
-CMD ["npm", "run", "start:dev"]
 
 
 FROM base AS build
@@ -31,11 +30,11 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
 
 
-FROM base as prod
-ENV NODE_ENV production
+FROM base AS prod
+ENV NODE_ENV=production
 USER node
 COPY package.json .
-COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
