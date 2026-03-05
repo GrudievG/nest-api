@@ -24,7 +24,11 @@ export class OrdersResolver {
 
   @Query(() => [OrderType])
   async orders(@Args() args: OrdersArgs): Promise<Order[]> {
-    return this.ordersService.listOrders(args);
+    return this.ordersService.listOrders({
+      ...args,
+      from: args.dateFrom,
+      to: args.dateTo,
+    });
   }
 
   @ResolveField(() => UserType, { nullable: true })

@@ -43,6 +43,15 @@ The service instance is attached to the GraphQL context, allowing any resolver t
 
 Additionally, SQL query logging was enabled to monitor the number of database queries executed when fetching orders and their related entities. This allowed me to verify that the number of queries was reduced after introducing DataLoader.
 
+Number of queries, using naive implementation with plain findOne() for users:
+   Limit 1: 7 queries;
+   Limit 2: 10 queries;
+   Limit 3: 13 queries;
+Number of queries, using DataLoader:
+   Limit 1: 6 queries;
+   Limit 2: 6 queries;
+   Limit 3: 6 queries;
+
 ---
 
 # Example GraphQL Query

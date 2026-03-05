@@ -1,6 +1,6 @@
 import { ArgsType, Field, Int } from '@nestjs/graphql';
 import { OrderStatus } from '../../orders/entities/order.entity';
-import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
+import { IsDate, IsEnum, IsInt, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 @ArgsType()
@@ -21,4 +21,16 @@ export class OrdersArgs {
   @IsInt()
   @Min(0)
   offset: number = 0;
+
+  @Field(() => Date, { nullable: true })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  dateFrom?: Date;
+
+  @Field(() => Date, { nullable: true })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  dateTo?: Date;
 }
