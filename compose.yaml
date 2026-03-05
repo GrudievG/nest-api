@@ -13,11 +13,13 @@ services:
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
-      - AWS_REGION=${AWS_REGION}
-      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL}
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_S3_FORCE_PATH_STYLE=true
       - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
     command: npm run start:prod
     depends_on:
@@ -29,6 +31,73 @@ services:
       - internal
       - public
 
+  api-distroless:
+    build:
+      context: .
+      target: prod-distroless
+    container_name: rd-api-distroless
+    restart: unless-stopped
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-rd-nest-api}
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:3000"
+    networks:
+      - internal
+      - public
+    profiles: [ "distroless" ]
+
+  api-hardened:
+    build:
+      context: .
+      target: prod
+    container_name: rd-api-hardened
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-rd-nest-api}
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL}
+      - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8082:3000"
+    networks:
+      - internal
+      - public
+    profiles: [ "hardened" ]
 
   postgres:
     image: postgres:16-alpine
@@ -47,7 +116,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
 
   minio:
     image: minio/minio:latest
@@ -68,11 +136,13 @@ services:
     image: minio/mc:latest
     restart: "no"
     depends_on:
-      minio:
-        condition: service_healthy
+      - minio
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
+      until mc alias set local http://minio:9000 ${AWS_ACCESS_KEY_ID:-minioadmin} ${AWS_SECRET_ACCESS_KEY:-minioadmin}; do
+        echo 'waiting for minio...';
+        sleep 2;
+      done;
       mc mb --ignore-existing local/${AWS_S3_BUCKET} &&
       mc anonymous set none local/${AWS_S3_BUCKET};
       echo 'MinIO bucket is ready';
