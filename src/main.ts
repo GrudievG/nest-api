@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggerInterceptor } from './common/interceptors/http-logger.interceptor';
 
@@ -10,7 +10,9 @@ async function bootstrap() {
     cors: true,
   });
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'graphql', method: RequestMethod.ALL }],
+  });
   app.enableVersioning({ type: VersioningType.URI });
 
   app.useGlobalInterceptors(new HttpLoggerInterceptor());
