@@ -24,7 +24,7 @@ export class OrdersResolver {
 
   @Query(() => [OrderType])
   async orders(@Args() args: OrdersArgs): Promise<Order[]> {
-    return this.ordersService.listOrders({
+    return this.ordersService.getList({
       ...args,
       from: args.dateFrom,
       to: args.dateTo,
