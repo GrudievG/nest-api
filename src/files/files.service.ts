@@ -39,6 +39,12 @@ export class FilesService {
   async createPresignedUpload(user: AuthUser, dto: PresignFileDto) {
     this.validateUploadInput(dto);
 
+    const canWriteFile = user.scopes.includes('files:write');
+
+    if (!canWriteFile) {
+      throw new ForbiddenException('Cannot attach another user file');
+    }
+
     const objectKey = this.buildObjectKey(dto.kind, user.sub, dto.contentType);
 
     const file = this.filesRepository.create({

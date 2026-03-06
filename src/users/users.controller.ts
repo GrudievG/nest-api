@@ -52,7 +52,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('me/avatar')
-  async setMyAvatar(
+  setMyAvatar(
     @Req() req: Request & { user?: AuthUser },
     @Body() body: AttachFileDto,
   ) {
