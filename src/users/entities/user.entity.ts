@@ -3,11 +3,14 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import type { Order } from '../../orders/entities/order.entity';
+import { FileRecord } from '../../files/file-record.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -53,6 +56,13 @@ export class User {
     default: () => `'ARRAY[]::text[]'`,
   })
   scopes: string[];
+
+  @Column({ type: 'uuid', name: 'avatar_file_id', nullable: true })
+  avatarFileId: string | null;
+
+  @ManyToOne(() => FileRecord, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'avatar_file_id' })
+  avatarFile: FileRecord | null;
 
   @OneToMany('Order', (order: Order) => order.user)
   orders: Order[];

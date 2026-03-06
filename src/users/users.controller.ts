@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { RegisterUserDto } from './dto/register-user.dto';
@@ -18,6 +19,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from './entities/user.entity';
+import { AuthUser } from '../auth/types';
+import { AttachFileDto } from '../files/dto/attach-file.dto';
 
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
@@ -45,6 +48,15 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(id, updateUserDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/avatar')
+  setMyAvatar(
+    @Req() req: Request & { user?: AuthUser },
+    @Body() body: AttachFileDto,
+  ) {
+    return this.usersService.setAvatar((req.user as AuthUser).sub, body.fileId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
