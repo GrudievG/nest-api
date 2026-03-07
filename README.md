@@ -36,21 +36,58 @@ In my opinion, the use of **Decorators** is particularly noteworthy. They provid
 
 ## Project setup
 
+### Development Workflow:
+
+Start environment:
 ```bash
-$ npm install
+docker compose -f compose.yaml -f compose.dev.yaml up --watch
 ```
 
-## Compile and run the project
-
+Run Migrations:
 ```bash
-# development
-$ npm run start
+docker compose -f compose.yaml -f compose.dev.yaml run --build --rm migrate
+```
 
-# watch mode
-$ npm run start:dev
+Run Seed:
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml run --build --rm seed
+```
 
-# production mode
-$ npm run start:prod
+Create MinIO Bucket:
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml --profile tools up minio-init
+```
+
+### Production Mode:
+
+Start environment:
+```bash
+docker compose up --build
+```
+
+Run Migrations:
+```bash
+docker compose run --rm seed
+```
+
+Run Seed:
+```bash
+docker compose --profile tools up minio-init
+```
+
+Create MinIO Bucket:
+```bash
+docker compose --profile tools up minio-init
+```
+
+### Distroless Runtime
+```bash
+docker compose --profile distroless up --build api-distroless
+```
+
+### Hardened Runtime
+```bash
+docker compose --profile hardened up --build api-hardened
 ```
 
 ## Run tests

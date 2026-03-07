@@ -1,0 +1,68 @@
+services:
+
+  api:
+    build:
+      context: .
+      target: dev
+    command: npm run start:dev
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-rd-nest-api}
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_S3_FORCE_PATH_STYLE=true
+      - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /usr/src/app
+          ignore:
+            - node_modules/
+            - dist/
+            - .git/
+        - action: rebuild
+          path: package.json
+
+  postgres:
+    ports:
+      - "5555:5432"
+    networks:
+      - internal
+      - public
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - internal
+      - public
+
+  minio-init:
+    networks:
+      - internal
+      - public
+
+  migrate:
+    build:
+      context: .
+      target: dev
+    command: [ "npm", "run", "db:migrate" ]
+
+  seed:
+    build:
+      context: .
+      target: dev
+    command: [ "npm", "run", "db:seed" ]
