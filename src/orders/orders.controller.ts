@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
@@ -17,16 +18,42 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { RolesGuard } from '../auth/roles.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ScopesGuard } from '../auth/scopes.guard';
+import { Scopes } from '../auth/scopes.decorator';
+import { AuthUser } from '../auth/types';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ScopesGuard)
 @Controller({ path: 'orders', version: '1' })
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  @Roles(UserRole.USER)
+  @Roles(UserRole.USER, UserRole.ADMIN)
+  @Scopes('orders:write')
   @Post()
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
+  create(
+    @Req() req: Request & { user?: AuthUser },
+    @Body() createOrderDto: CreateOrderDto,
+  ) {
+    const items = createOrderDto?.items ?? [];
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new BadRequestException('items must be a non-empty array');
+    }
+
+    for (const it of items) {
+      if (!it?.productId || typeof it.productId !== 'string') {
+        throw new BadRequestException('items[].productId is required');
+      }
+      if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
+        throw new BadRequestException(
+          'items[].quantity must be a positive integer',
+        );
+      }
+    }
+
+    const userId = (req.user as AuthUser).sub;
+
+    return this.ordersService.create(userId, createOrderDto);
   }
 
   @Roles(UserRole.USER, UserRole.ADMIN, UserRole.SUPPORT)

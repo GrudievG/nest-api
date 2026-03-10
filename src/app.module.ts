@@ -22,13 +22,15 @@ import { AppGraphqlModule } from './graphql/graphql.module';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 import { FilesModule } from './files/files.module';
+import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
+import rabbitmqConfig from './config/rabbitmq.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       skipProcessEnv: true,
-      load: [appConfig, databaseConfig, authConfig, awsConfig],
+      load: [appConfig, databaseConfig, authConfig, awsConfig, rabbitmqConfig],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -53,6 +55,7 @@ import { FilesModule } from './files/files.module';
     AuthModule,
     PaymentsModule,
     FilesModule,
+    RabbitmqModule,
   ],
   controllers: [AppController],
   providers: [AppService],
