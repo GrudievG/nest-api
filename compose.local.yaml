@@ -1,0 +1,57 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: rd-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-rd-nest-api}
+    ports:
+      - "5555:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: rd-minio-local
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  minio-init:
+    image: minio/mc:latest
+    restart: "no"
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${AWS_ACCESS_KEY_ID:-minioadmin} ${AWS_SECRET_ACCESS_KEY:-minioadmin}; do
+        echo 'waiting for minio...';
+        sleep 2;
+      done;
+      mc mb --ignore-existing local/${AWS_S3_BUCKET} &&
+      mc anonymous set none local/${AWS_S3_BUCKET};
+      echo 'MinIO bucket is ready';
+      "
+    profiles: [ "tools" ]
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rd-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+
+volumes:
+  db-data:
+  minio-data:
