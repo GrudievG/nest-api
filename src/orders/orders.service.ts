@@ -12,6 +12,8 @@ import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { ListOrdersDto } from './dto/list-orders.dto';
+import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
+import { OrdersProcessMessage } from './orders-queue.types';
 
 @Injectable()
 export class OrdersService {
@@ -23,15 +25,12 @@ export class OrdersService {
     private readonly productsRepository: Repository<Product>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly rabbitmqService: RabbitmqService,
   ) {}
 
-  async create(input: CreateOrderDto) {
-    if (!input.userId || input.items.length === 0) {
-      throw new BadRequestException('userId and items are required');
-    }
-
+  async create(userId: string, input: CreateOrderDto) {
     const user = await this.usersRepository.findOne({
-      where: { id: input.userId },
+      where: { id: userId },
     });
 
     if (!user) {
@@ -61,7 +60,7 @@ export class OrdersService {
     );
 
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      const created = await this.dataSource.transaction(async (manager) => {
         const orderRepository = manager.getRepository(Order);
         const orderItemRepository = manager.getRepository(OrderItem);
         const productRepository = manager.getRepository(Product);
@@ -131,17 +130,27 @@ export class OrdersService {
 
         await orderItemRepository.save(orderItems);
 
-        const created = await orderRepository.findOne({
+        const createdOrder = await orderRepository.findOne({
           where: { id: order.id },
           relations: { user: true, items: { product: true } },
         });
 
-        if (!created) {
+        if (!createdOrder) {
           throw new Error('Order creation failed');
         }
 
-        return created;
+        return createdOrder;
       });
+      const message: OrdersProcessMessage = {
+        messageId: created.id,
+        orderId: created.id,
+        attempt: 1,
+      };
+      this.rabbitmqService.publishToQueue('orders.process', message, {
+        messageId: message.messageId,
+      });
+
+      return created;
     } catch (error: unknown) {
       if (
         error instanceof QueryFailedError &&

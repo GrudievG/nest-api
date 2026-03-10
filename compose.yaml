@@ -132,6 +132,14 @@ services:
     ports:
       - "9001:9001" # console only
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rd-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+
   minio-init:
     image: minio/mc:latest
     restart: "no"
