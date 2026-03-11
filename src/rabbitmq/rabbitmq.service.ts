@@ -60,11 +60,6 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
 
     await ch.assertQueue('orders.process', { durable: true });
     await ch.assertQueue('orders.dlq', { durable: true });
-
-    await ch.assertQueue('payments.jobs', { durable: true });
-    await ch.assertQueue('payments.dlq', { durable: true });
-
-    await ch.assertQueue('domain.events', { durable: true });
   }
 
   publishToQueue(
@@ -91,6 +86,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
 
     await ch.consume(
       queue,
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       async (msg) => {
         if (!msg) {
           return;

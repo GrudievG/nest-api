@@ -9,6 +9,7 @@ import { AddUserPasswordHash1771603078887 } from './migrations/1771603078887-Add
 import { CreatePaymentEntity1771784004287 } from './migrations/1771784004287-CreatePaymentEntity';
 import { CreateFileRecordEntity1771948499029 } from './migrations/1771948499029-CreateFileRecordEntity';
 import { AddProductImageRelation1771966821516 } from './migrations/1771966821516-AddProductImageRelation';
+import { CreateProcessedMessageEntity1773258734771 } from './migrations/1773258734771-CreateProcessedMessageEntity';
 
 const appDataSource = new DataSource({
   type: 'postgres',
@@ -28,6 +29,7 @@ const appDataSource = new DataSource({
     CreatePaymentEntity1771784004287,
     CreateFileRecordEntity1771948499029,
     AddProductImageRelation1771966821516,
+    CreateProcessedMessageEntity1773258734771,
   ],
   synchronize: false,
 });
