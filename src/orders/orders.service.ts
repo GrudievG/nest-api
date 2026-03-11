@@ -14,6 +14,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { ListOrdersDto } from './dto/list-orders.dto';
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import { OrdersProcessMessage } from './orders-queue.types';
+import { ProcessedMessage } from '../idempotency/processed-message.entity';
 
 @Injectable()
 export class OrdersService {
@@ -170,6 +171,42 @@ export class OrdersService {
 
       throw error;
     }
+  }
+
+  async processFromQueue(message: OrdersProcessMessage): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      try {
+        await manager.getRepository(ProcessedMessage).insert({
+          scope: 'orders.process',
+          messageId: message.messageId,
+          idempotencyKey: null,
+        });
+      } catch (error: unknown) {
+        if (
+          error instanceof QueryFailedError &&
+          'code' in error &&
+          error?.code === '23505'
+        ) {
+          return;
+        }
+        throw error;
+      }
+
+      if (message.simulate === 'alwaysFail') {
+        throw new Error('Simulated processing error');
+      }
+
+      const orderRepository = manager.getRepository(Order);
+      const order = await orderRepository.findOne({
+        where: { id: message.orderId },
+      });
+      if (!order) {
+        throw new Error('Order not found');
+      }
+
+      order.status = OrderStatus.PROCESSED;
+      await orderRepository.save(order);
+    });
   }
 
   async getList(input: ListOrdersDto): Promise<Order[]> {
