@@ -23,6 +23,7 @@ import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 import { FilesModule } from './files/files.module';
 import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
+import { DebugModule } from './debug/debug.module';
 import rabbitmqConfig from './config/rabbitmq.config';
 
 @Module({
@@ -56,6 +57,7 @@ import rabbitmqConfig from './config/rabbitmq.config';
     PaymentsModule,
     FilesModule,
     RabbitmqModule,
+    DebugModule,
   ],
   controllers: [AppController],
   providers: [AppService],
