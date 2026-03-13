@@ -238,6 +238,13 @@ export class OrdersService {
     return qb.getMany();
   }
 
+  async findById(id: string): Promise<Order | null> {
+    return this.ordersRepository.findOne({
+      where: { id },
+      relations: { user: true, items: { product: true } },
+    });
+  }
+
   async delete(id: string): Promise<boolean> {
     const result = await this.ordersRepository.delete({ id });
     return (result.affected ?? 0) > 0;

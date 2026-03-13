@@ -94,6 +94,15 @@ export class OrdersController {
     });
   }
 
+  @Get(':id')
+  async byId(@Param('id') id: string) {
+    const order = await this.ordersService.findById(id);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return order;
+  }
+
   @Roles(UserRole.ADMIN)
   @Delete(':id')
   async remove(@Param('id') id: string) {
