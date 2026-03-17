@@ -6,6 +6,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -21,11 +22,21 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ScopesGuard } from '../auth/scopes.guard';
 import { Scopes } from '../auth/scopes.decorator';
 import { AuthUser } from '../auth/types';
+import {
+  AuthorizeResponse,
+  GetPaymentStatusResponse,
+  PaymentsGrpcClient,
+} from './payments-grpc.client';
+import { AuthorizeOrderDto } from './dto/authorize-order.dto';
+import { randomUUID } from 'node:crypto';
 
 @UseGuards(JwtAuthGuard, RolesGuard, ScopesGuard)
 @Controller({ path: 'orders', version: '1' })
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly paymentsGrpcClient: PaymentsGrpcClient,
+  ) {}
 
   @Roles(UserRole.USER, UserRole.ADMIN)
   @Scopes('orders:write')
@@ -113,5 +124,32 @@ export class OrdersController {
     }
 
     return { ok: true };
+  }
+
+  @Post(':orderId/pay')
+  async payOrder(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Req() req: Request & { user?: AuthUser },
+    @Body() dto: AuthorizeOrderDto,
+  ): Promise<AuthorizeResponse> {
+    const userId = (req.user as AuthUser).sub;
+    return this.paymentsGrpcClient.authorize({
+      orderId,
+      userId,
+      total: {
+        amount: dto.amount,
+        currency: dto.currency,
+      },
+      idempotencyKey: dto.idempotencyKey ?? randomUUID(),
+      paymentMethod: dto.paymentMethod,
+      simulateUnavailableOnce: dto.simulateUnavailableOnce,
+    });
+  }
+
+  @Get('payments/:paymentId/status')
+  async paymentStatus(
+    @Param('paymentId', ParseUUIDPipe) paymentId: string,
+  ): Promise<GetPaymentStatusResponse> {
+    return this.paymentsGrpcClient.getStatus(paymentId);
   }
 }
