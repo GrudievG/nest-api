@@ -20,11 +20,13 @@ import { OrdersModule } from './orders/orders.module';
 import { ProductsModule } from './products/products.module';
 import { AppGraphqlModule } from './graphql/graphql.module';
 import { AuthModule } from './auth/auth.module';
-import { PaymentsModule } from './payments/payments.module';
 import { FilesModule } from './files/files.module';
 import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import { DebugModule } from './debug/debug.module';
 import rabbitmqConfig from './config/rabbitmq.config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { PAYMENTS_PACKAGE_NAME } from './common/grpc.constants';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -54,7 +56,6 @@ import rabbitmqConfig from './config/rabbitmq.config';
     ProductsModule,
     AppGraphqlModule,
     AuthModule,
-    PaymentsModule,
     FilesModule,
     RabbitmqModule,
     DebugModule,
