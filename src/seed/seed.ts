@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { In } from 'typeorm';
+import bcrypt from 'bcrypt';
 import dataSource from '../../data-source';
-import { User } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 import { Product } from '../products/entities/product.entity';
 import { Order } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
@@ -20,8 +21,41 @@ type SeedOrder = {
 };
 
 const usersSeed = [
-  { email: 'alice@example.com', firstName: 'Alice', lastName: 'Smith' },
-  { email: 'bob@example.com', firstName: 'Bob', lastName: 'Jones' },
+  {
+    email: 'alice@example.com',
+    firstName: 'Alice',
+    lastName: 'Smith',
+    roles: [UserRole.USER],
+    scopes: ['orders:read', 'orders:write', 'files:write'],
+  },
+  {
+    email: 'bob@example.com',
+    firstName: 'Bob',
+    lastName: 'Jones',
+    roles: [UserRole.SUPPORT],
+    scopes: [
+      'orders:read',
+      'payments:read',
+      'payments:write',
+      'products:images:write',
+    ],
+  },
+  {
+    email: 'admin@example.com',
+    firstName: 'Admin',
+    lastName: 'User',
+    roles: [UserRole.ADMIN],
+    scopes: [
+      'orders:read',
+      'orders:write',
+      'payments:read',
+      'payments:write',
+      'refunds:write',
+      'products:images:write',
+      'products:images:assign:any',
+      'files:read:any',
+    ],
+  },
 ];
 
 const productsSeed = [
@@ -69,7 +103,7 @@ const ordersSeed: SeedOrder[] = [
   },
 ];
 
-async function seed() {
+export async function runSeed() {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('Seeding is disabled in production');
   }
@@ -82,7 +116,11 @@ async function seed() {
     const ordersRepository = dataSource.getRepository(Order);
     const orderItemsRepository = dataSource.getRepository(OrderItem);
 
-    await usersRepository.upsert(usersSeed, ['email']);
+    const passwordHash = await bcrypt.hash('password123', 10);
+    await usersRepository.upsert(
+      usersSeed.map((user) => ({ ...user, passwordHash })),
+      ['email'],
+    );
     await productsRepository.upsert(productsSeed, ['title']);
 
     const users = await usersRepository.find({
@@ -141,7 +179,9 @@ async function seed() {
   }
 }
 
-seed().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (require.main === module) {
+  runSeed().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

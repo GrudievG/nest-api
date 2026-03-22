@@ -9,12 +9,14 @@ import bcrypt from 'bcrypt';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserRole } from './entities/user.entity';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly filesService: FilesService,
   ) {}
   private static readonly SALT_ROUNDS = 10;
   private readonly users = new Map<string, User>();
@@ -132,5 +134,25 @@ export class UsersService {
     if (!deleted) {
       throw new NotFoundException('User not found');
     }
+  }
+
+  async setAvatar(
+    userId: string,
+    fileId: string,
+  ): Promise<{ userId: string; avatarFileId: string; avatarUrl: string }> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const file = await this.filesService.getReadyOwnedFile(fileId, userId);
+    user.avatarFileId = file.id;
+    await this.usersRepository.save(user);
+
+    return {
+      userId: user.id,
+      avatarFileId: file.id,
+      avatarUrl: this.filesService.buildPublicUrl(file.objectKey),
+    };
   }
 }
