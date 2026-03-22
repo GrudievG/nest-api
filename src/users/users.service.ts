@@ -3,11 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
+import bcrypt from 'bcrypt';
+import { RegisterUserDto } from './dto/register-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { User, UserRole } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -15,19 +16,49 @@ export class UsersService {
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
   ) {}
+  private static readonly SALT_ROUNDS = 10;
   private readonly users = new Map<string, User>();
 
-  async create(createUserDto: CreateUserDto) {
-    const existing = await this.usersRepository.findOne({
-      where: { email: createUserDto.email },
-    });
+  async create(
+    registerUserDto: RegisterUserDto,
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const email = registerUserDto.email.trim().toLowerCase();
 
-    if (existing) {
-      throw new ConflictException('User already exists');
+    const passwordHash = await bcrypt.hash(
+      registerUserDto.password,
+      UsersService.SALT_ROUNDS,
+    );
+
+    try {
+      const user = this.usersRepository.create({
+        email,
+        firstName: registerUserDto.firstName,
+        lastName: registerUserDto.lastName,
+        passwordHash,
+        roles: [UserRole.USER],
+        scopes: [],
+      });
+
+      const saved = await this.usersRepository.save(user);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { passwordHash: _passwordHash, ...result } = saved;
+
+      return result;
+    } catch (error: unknown) {
+      // Postgres unique violation
+      if (error instanceof QueryFailedError) {
+        const pgError = error as QueryFailedError & {
+          driverError?: { code?: string };
+        };
+
+        if (pgError.driverError?.code === '23505') {
+          throw new ConflictException('Email already registered');
+        }
+      }
+
+      throw error;
     }
-
-    const user = this.usersRepository.create(createUserDto);
-    return this.usersRepository.save(user);
   }
 
   // TODO: Implement pagination

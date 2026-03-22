@@ -9,6 +9,12 @@ import {
 } from 'typeorm';
 import type { Order } from '../../orders/entities/order.entity';
 
+export enum UserRole {
+  USER = 'user',
+  SUPPORT = 'support',
+  ADMIN = 'admin',
+}
+
 @Entity('users')
 @Index('IDX_users_email_unique', ['email'], { unique: true })
 export class User {
@@ -23,6 +29,30 @@ export class User {
 
   @Column()
   lastName: string;
+
+  @Column({
+    type: 'varchar',
+    length: 255,
+    name: 'password_hash',
+    select: false,
+  })
+  passwordHash: string;
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    enumName: 'user_role_enum',
+    array: true,
+    default: () => `ARRAY['user']::user_role_enum[]`,
+  })
+  roles: UserRole[];
+
+  @Column({
+    type: 'text',
+    array: true,
+    default: () => `'ARRAY[]::text[]'`,
+  })
+  scopes: string[];
 
   @OneToMany('Order', (order: Order) => order.user)
   orders: Order[];

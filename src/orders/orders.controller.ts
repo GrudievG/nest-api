@@ -2,25 +2,36 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  NotFoundException,
+  Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from './entities/order.entity';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../users/entities/user.entity';
+import { RolesGuard } from '../auth/roles.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller({ path: 'orders', version: '1' })
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @Roles(UserRole.USER)
   @Post()
   create(@Body() createOrderDto: CreateOrderDto) {
     return this.ordersService.create(createOrderDto);
   }
 
+  @Roles(UserRole.USER, UserRole.ADMIN, UserRole.SUPPORT)
   @Get()
-  list(
+  getList(
     @Query('userId') userId?: string,
     @Query('status') status?: OrderStatus,
     @Query('from') from?: string,
@@ -46,7 +57,7 @@ export class OrdersController {
       throw new BadRequestException('to must be valid date');
     }
 
-    return this.ordersService.listOrders({
+    return this.ordersService.getList({
       userId,
       status,
       from: fromDate,
@@ -54,5 +65,17 @@ export class OrdersController {
       limit: safeLimit,
       offset: safeOffset,
     });
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    const deleted = await this.ordersService.delete(id);
+
+    if (!deleted) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return { ok: true };
   }
 }
