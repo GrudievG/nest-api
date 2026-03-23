@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import type { Logger, QueryRunner } from 'typeorm';
 import { requestContext } from '../middleware/request-context.middleware';
 
