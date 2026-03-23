@@ -1,0 +1,41 @@
+name: PR Checks
+on:
+  pull_request:
+    branches: [ develop, main ]
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Print toolchain versions
+        shell: bash
+        run: |
+          echo "node=$(node --version)"
+          echo "npm=$(npm --version)"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build check
+        run: npm run build
+
+      - name: Docker build validation
+        run: docker build -t test-build .
