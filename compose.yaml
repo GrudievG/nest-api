@@ -64,7 +64,7 @@ services:
   api-hardened:
     build:
       context: .
-      target: prod
+      target: prod-hardened
     container_name: rd-api-hardened
     restart: unless-stopped
     read_only: true
