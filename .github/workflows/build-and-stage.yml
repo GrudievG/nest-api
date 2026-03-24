@@ -1,0 +1,98 @@
+name: Build and Deploy to Stage
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@main
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set metadata
+        id: meta
+        run: |
+          TAG=sha-${GITHUB_SHA}
+          IMAGE=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$TAG
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Build image
+        run: |
+          docker build -t ${{ steps.meta.outputs.image }} .
+
+      - name: Push image
+        run: |
+          docker push ${{ steps.meta.outputs.image }}
+
+      - name: Save release manifest
+        run: |
+          cat <<EOF > release-manifest.json
+          {
+            "commit": "${GITHUB_SHA}",
+            "services": {
+              "api": {
+                "image": "${{ steps.meta.outputs.image }}"
+              }
+            }
+          }
+          EOF
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: release-manifest.json
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: stage
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGE_HOST }}
+          username: ${{ secrets.STAGE_USER }}
+          key: ${{ secrets.STAGE_SSH_KEY }}
+          script: |
+            set -e
+            
+            IMAGE=${{ needs.build.outputs.image }}
+            
+            echo "Deploying image: $IMAGE"
+            
+            # Login to ECR from EC2
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+              | docker login --username AWS --password-stdin $(echo $IMAGE | cut -d'/' -f1)
+            
+            docker pull $IMAGE
+            
+            cd ~/app
+            
+            IMAGE=$IMAGE docker compose -f docker-compose.stage.yml up -d
+
+      - name: Smoke test
+        run: |
+          curl -f https://${{ secrets.STAGE_HOST }}:3000
