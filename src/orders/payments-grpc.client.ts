@@ -97,6 +97,7 @@ export class PaymentsGrpcClient implements OnModuleInit {
             count: maxRetries,
             delay: (error, retryIndex) => {
               if (!this.isTransient(error)) {
+                // eslint-disable-next-line
                 return throwError(() => error);
               }
 

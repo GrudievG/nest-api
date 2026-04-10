@@ -24,9 +24,6 @@ import { FilesModule } from './files/files.module';
 import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import { DebugModule } from './debug/debug.module';
 import rabbitmqConfig from './config/rabbitmq.config';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { PAYMENTS_PACKAGE_NAME } from './common/grpc.constants';
-import { join } from 'path';
 
 @Module({
   imports: [
