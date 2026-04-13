@@ -104,10 +104,6 @@ const ordersSeed: SeedOrder[] = [
 ];
 
 export async function runSeed() {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('Seeding is disabled in production');
-  }
-
   await dataSource.initialize();
 
   try {
