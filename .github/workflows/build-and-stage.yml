@@ -75,56 +75,63 @@ jobs:
     needs: build
     environment: stage
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1
+
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.STAGE_HOST }}
-          username: ${{ secrets.STAGE_USER }}
-          key: ${{ secrets.STAGE_SSH_KEY }}
-          script: |
-            set -e
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-            IMAGE=${{ needs.build.outputs.image }}
+      - name: Deploy via SSM
+        run: |
+          IMAGE=${{ needs.build.outputs.image }}
 
-            echo "Deploying image: $IMAGE"
+          echo "Deploying image: $IMAGE"
+          
+          aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Nest API" \
+            --parameters commands="
+              set -e
 
-            # Login to ECR from EC2
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-              | docker login --username AWS --password-stdin $(echo $IMAGE | cut -d'/' -f1)
+          echo 'Using image: $IMAGE'
 
-            docker pull $IMAGE
+          cd ~/app
+          
+          export ECR_IMAGE=$IMAGE
 
-            cd ~/app
-            
-            export ECR_IMAGE=$IMAGE
+          export DB_USER='${{ secrets.DB_USER }}'
+          export DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
+          export DB_NAME='${{ secrets.DB_NAME }}'
 
-            export DB_USER='${{ secrets.DB_USER }}'
-            export DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
-            export DB_NAME='${{ secrets.DB_NAME }}'
-  
-            export JWT_SECRET='${{ secrets.JWT_SECRET }}'
-            export JWT_EXPIRES_IN='${{ secrets.JWT_EXPIRES_IN }}'
-  
-            export AWS_REGION='${{ secrets.AWS_REGION }}'
-            export AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}'
-            export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
-            export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-  
-            echo "Stopping old containers"
-            docker-compose down
-  
-            echo "Pulling latest images"
-            docker-compose pull
-  
-            echo "Starting infrastructure (db, mq)"
-            docker-compose -f docker-compose.stage.yml up -d
-  
-            echo "Running migrations"
-            docker-compose run --rm migrate
-  
-            echo "Running seed"
-            docker-compose run --rm seed
+          export JWT_SECRET='${{ secrets.JWT_SECRET }}'
+          export JWT_EXPIRES_IN='${{ secrets.JWT_EXPIRES_IN }}'
+
+          export AWS_REGION='${{ secrets.AWS_REGION }}'
+          export AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}'
+          export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+          export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+
+          echo "Stopping old containers"
+          docker-compose down
+
+          echo "Pulling latest images"
+          docker-compose pull
+
+          echo "Starting infrastructure (db, mq)"
+          docker-compose -f docker-compose.stage.yml up -d
+
+          echo "Running migrations"
+          docker-compose run --rm migrate
+
+          echo "Running seed"
+          docker-compose run --rm seed
 
       - name: Smoke test
         run: |
