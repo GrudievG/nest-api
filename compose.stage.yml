@@ -25,6 +25,9 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    networks:
+      - internal
+      - public
 
   migrate:
     image: ${ECR_IMAGE}
@@ -38,7 +41,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    profiles: [ "tools" ]
+    networks:
+      - internal
 
   seed:
     image: ${ECR_IMAGE}
@@ -52,6 +56,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    networks:
+      - internal
 
 
   api:

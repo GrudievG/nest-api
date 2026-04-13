@@ -40,12 +40,16 @@ jobs:
         run: |
           TAG=sha-${GITHUB_SHA::7}
           IMAGE=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$TAG
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build image
         run: |
-          docker build -t ${{ steps.meta.outputs.image }} .
+          docker build --target prod -t ${{ steps.meta.outputs.image }} --push .
 
       - name: Push image
         run: |
@@ -87,52 +91,123 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Download release manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Extract IMAGE from manifest
+        run: |
+          IMAGE=$(jq -r '.services.api.image' release-manifest.json)
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "Extracted IMAGE: $IMAGE"
+
       - name: Deploy via SSM
         run: |
-          IMAGE=${{ needs.build.outputs.image }}
-
           echo "Deploying image: $IMAGE"
+
+          cat <<EOF > commands.json
+          {
+            "commands": [
+              "set -e",
+              "echo ===== DEPLOY START =====",
+              "cd /opt/api",
+
+              "export ECR_IMAGE='$IMAGE'",
           
-          aws ssm send-command \
+              "export AWS_REGION=${{ secrets.AWS_REGION }}",
+
+              "echo Logging into ECR",
+              "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin 924665350640.dkr.ecr.${AWS_REGION}.amazonaws.com",
+
+              "echo Creating .env file",
+              "cat <<EOF > .env",
+              "DB_HOST=postgres",
+              "DB_PORT=5432",
+              "DB_USER=${{ secrets.DB_USER }}",
+              "DB_PASSWORD=${{ secrets.DB_PASSWORD }}",
+              "DB_NAME=${{ secrets.DB_NAME }}",
+              "JWT_SECRET=${{ secrets.JWT_SECRET }}",
+              "JWT_EXPIRES_IN=${{ vars.JWT_EXPIRES_IN }}",
+              "AWS_REGION=${{ secrets.AWS_REGION }}",
+              "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}",
+              "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}",
+              "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}",
+              "AWS_CLOUDFRONT_URL=${{ secrets.AWS_CLOUDFRONT_URL }}",
+              "FILES_PRESIGN_EXPIRES_IN_SEC=${{ vars.FILES_PRESIGN_EXPIRES_IN_SEC }}",
+              "RABBITMQ_URL=${{ secrets.RABBITMQ_URL }}",
+              "RABBITMQ_PREFETCH=${{ vars.RABBITMQ_PREFETCH }}",
+              "PAYMENTS_GRPC_URL=${{ vars.PAYMENTS_GRPC_URL }}",
+              "PAYMENTS_GRPC_BIND_URL=${{ vars.PAYMENTS_GRPC_BIND_URL }}",
+              "PAYMENTS_RPC_TIMEOUT_MS=${{ vars.PAYMENTS_RPC_TIMEOUT_MS }}",
+              "PAYMENTS_RPC_MAX_RETRIES=${{ vars.PAYMENTS_RPC_MAX_RETRIES }}",
+              "PAYMENTS_RPC_BACKOFF_MS=${{ vars.PAYMENTS_RPC_BACKOFF_MS }}",
+              "EOF", 
+  
+              "echo Stopping old containers",
+              "docker-compose -f docker-compose.stage.yml down || true",
+
+              "echo Pulling latest images",
+              "docker-compose -f docker-compose.stage.yml pull",
+
+              "echo Starting infrastructure",
+              "docker-compose -f docker-compose.stage.yml up -d postgres rabbitmq",
+
+              "echo Running migrations",
+              "docker-compose -f docker-compose.stage.yml run --rm migrate",
+
+              "echo Running seed",
+              "docker-compose -f docker-compose.stage.yml run --rm seed",
+          
+              "echo Starting api ",
+              "docker-compose -f docker-compose.stage.yml up -d api",
+
+              "echo ===== DEPLOY DONE ====="
+            ]
+          }
+          EOF
+
+          COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy Nest API" \
-            --parameters commands="
-              set -e
+            --parameters file://commands.json \
+            --query "Command.CommandId" \
+            --output text)
 
-          echo 'Using image: $IMAGE'
+          echo "Command ID: $COMMAND_ID"
 
-          cd ~/app
-          
-          export ECR_IMAGE=$IMAGE
+          echo "Waiting for command execution..."
 
-          export DB_USER='${{ secrets.DB_USER }}'
-          export DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
-          export DB_NAME='${{ secrets.DB_NAME }}'
+          set +e
 
-          export JWT_SECRET='${{ secrets.JWT_SECRET }}'
-          export JWT_EXPIRES_IN='${{ secrets.JWT_EXPIRES_IN }}'
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
 
-          export AWS_REGION='${{ secrets.AWS_REGION }}'
-          export AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}'
-          export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
-          export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+          STATUS=$?
 
-          echo "Stopping old containers"
-          docker-compose down
+          echo "========== SSM OUTPUT =========="
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --query "StandardOutputContent" \
+            --output text
 
-          echo "Pulling latest images"
-          docker-compose pull
+          echo "========== SSM ERROR =========="
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --query "StandardErrorContent" \
+            --output text
 
-          echo "Starting infrastructure (db, mq)"
-          docker-compose -f docker-compose.stage.yml up -d
+          exit $STATUS
 
-          echo "Running migrations"
-          docker-compose run --rm migrate
-
-          echo "Running seed"
-          docker-compose run --rm seed
+      - name: Debug host
+        run: echo "HOST=${{ secrets.STAGE_HOST }}"
 
       - name: Smoke test
         run: |
-          curl -f https://${{ secrets.STAGE_HOST }}:3000
+          curl -f http://${{ secrets.STAGE_HOST }}:3000/api/v1/health

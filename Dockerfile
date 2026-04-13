@@ -36,6 +36,7 @@ USER node
 COPY package.json .
 COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/proto ./proto
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
 
@@ -45,6 +46,7 @@ WORKDIR /usr/src/app
 ENV NODE_ENV=production
 COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/proto ./proto
 COPY package*.json ./
 EXPOSE 3000
 CMD ["dist/main.js"]
@@ -55,6 +57,7 @@ WORKDIR /usr/src/app
 ENV NODE_ENV=production
 COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/proto ./proto
 COPY package*.json ./
 EXPOSE 3000
 CMD ["dist/main.js"]

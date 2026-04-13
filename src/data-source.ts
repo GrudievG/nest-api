@@ -10,6 +10,7 @@ import { CreatePaymentEntity1771784004287 } from './migrations/1771784004287-Cre
 import { CreateFileRecordEntity1771948499029 } from './migrations/1771948499029-CreateFileRecordEntity';
 import { AddProductImageRelation1771966821516 } from './migrations/1771966821516-AddProductImageRelation';
 import { CreateProcessedMessageEntity1773258734771 } from './migrations/1773258734771-CreateProcessedMessageEntity';
+import { EnableUuidExtension1600000000000 } from './migrations/1600000000000-EnableUuidExtension';
 
 const appDataSource = new DataSource({
   type: 'postgres',
@@ -18,8 +19,9 @@ const appDataSource = new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  entities: ['src/**/*.entity{.ts,.js}'],
+  entities: [__dirname + '/../**/*.entity.{js,ts}'],
   migrations: [
+    EnableUuidExtension1600000000000,
     CreateBaseEntities1770491913161,
     AddUserEmailUniqueIndex1770499624048,
     AddProductTitleUniqueIndex1770500167736,
