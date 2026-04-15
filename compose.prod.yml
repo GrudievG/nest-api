@@ -3,7 +3,7 @@ version: "3.8"
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: rd-postgres
+    container_name: rd-postgres-prod
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -20,7 +20,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: rd-rabbitmq
+    container_name: rd-rabbitmq-prod
     restart: unless-stopped
     ports:
       - "5672:5672"
@@ -44,31 +44,14 @@ services:
     networks:
       - internal
 
-  seed:
-    image: ${ECR_IMAGE}
-    command: [ "npm", "run", "db:seed:prod" ]
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    networks:
-      - internal
-
   api:
     image: ${ECR_IMAGE}
-    container_name: rd-api
+    container_name: rd-api-prod
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       migrate:
-        condition: service_completed_successfully
-      seed:
         condition: service_completed_successfully
     environment:
       DB_HOST: postgres
@@ -110,3 +93,4 @@ networks:
   internal:
     internal: true
   public:
+

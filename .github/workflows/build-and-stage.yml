@@ -1,4 +1,4 @@
-name: Build and Deploy to Stage
+name: Build and Deploy
 on:
   workflow_dispatch:
   push:
@@ -74,7 +74,7 @@ jobs:
           name: release-manifest
           path: release-manifest.json
 
-  deploy:
+  deploy-stage:
     runs-on: ubuntu-latest
     needs: build
     environment: stage
@@ -205,9 +205,150 @@ jobs:
 
           exit $STATUS
 
-      - name: Debug host
-        run: echo "HOST=${{ secrets.STAGE_HOST }}"
-
       - name: Smoke test
         run: |
           curl -f http://${{ secrets.STAGE_HOST }}:3000/api/v1/health
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: [build, deploy-stage]
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Deploy info
+        run: |
+          echo "========== PRODUCTION DEPLOY =========="
+          echo "Commit:      ${{ github.sha }}"
+          echo "Tag:         ${{ needs.build.outputs.tag }}"
+          echo "Environment: production"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "========================================"
+
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download release manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Extract IMAGE from manifest
+        run: |
+          IMAGE=$(jq -r '.services.api.image' release-manifest.json)
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "Extracted IMAGE: $IMAGE"
+
+      - name: Deploy via SSM
+        run: |
+          echo "Deploying image: $IMAGE to production"
+
+          cat <<EOF > commands.json
+          {
+            "commands": [
+              "set -e",
+              "echo ===== PRODUCTION DEPLOY START =====",
+              "cd /opt/api",
+
+              "export ECR_IMAGE='$IMAGE'",
+
+              "export AWS_REGION=${{ secrets.AWS_REGION }}",
+
+              "echo Logging into ECR",
+              "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin 924665350640.dkr.ecr.${AWS_REGION}.amazonaws.com",
+
+              "echo Creating .env file",
+              "cat <<EOF > .env",
+              "DB_HOST=postgres",
+              "DB_PORT=5432",
+              "DB_USER=${{ secrets.DB_USER }}",
+              "DB_PASSWORD=${{ secrets.DB_PASSWORD }}",
+              "DB_NAME=${{ secrets.DB_NAME }}",
+              "JWT_SECRET=${{ secrets.JWT_SECRET }}",
+              "JWT_EXPIRES_IN=${{ vars.JWT_EXPIRES_IN }}",
+              "AWS_REGION=${{ secrets.AWS_REGION }}",
+              "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}",
+              "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}",
+              "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}",
+              "AWS_CLOUDFRONT_URL=${{ secrets.AWS_CLOUDFRONT_URL }}",
+              "FILES_PRESIGN_EXPIRES_IN_SEC=${{ vars.FILES_PRESIGN_EXPIRES_IN_SEC }}",
+              "RABBITMQ_URL=${{ secrets.RABBITMQ_URL }}",
+              "RABBITMQ_PREFETCH=${{ vars.RABBITMQ_PREFETCH }}",
+              "PAYMENTS_GRPC_URL=${{ vars.PAYMENTS_GRPC_URL }}",
+              "PAYMENTS_GRPC_BIND_URL=${{ vars.PAYMENTS_GRPC_BIND_URL }}",
+              "PAYMENTS_RPC_TIMEOUT_MS=${{ vars.PAYMENTS_RPC_TIMEOUT_MS }}",
+              "PAYMENTS_RPC_MAX_RETRIES=${{ vars.PAYMENTS_RPC_MAX_RETRIES }}",
+              "PAYMENTS_RPC_BACKOFF_MS=${{ vars.PAYMENTS_RPC_BACKOFF_MS }}",
+              "EOF",
+
+              "echo Stopping old containers",
+              "docker-compose -f docker-compose.prod.yml down || true",
+
+              "echo Pulling latest images",
+              "docker-compose -f docker-compose.prod.yml pull",
+
+              "echo Starting infrastructure",
+              "docker-compose -f docker-compose.prod.yml up -d postgres rabbitmq",
+
+              "echo Running migrations",
+              "docker-compose -f docker-compose.prod.yml run --rm migrate",
+
+              "echo Starting api",
+              "docker-compose -f docker-compose.prod.yml up -d api",
+
+              "echo ===== PRODUCTION DEPLOY DONE ====="
+            ]
+          }
+          EOF
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file://commands.json \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "Command ID: $COMMAND_ID"
+
+          echo "Waiting for command execution..."
+
+          set +e
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
+
+          STATUS=$?
+
+          echo "========== SSM OUTPUT =========="
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --query "StandardOutputContent" \
+            --output text
+
+          echo "========== SSM ERROR =========="
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --query "StandardErrorContent" \
+            --output text
+
+          exit $STATUS
+
+      - name: Smoke test
+        run: |
+          curl -f http://${{ secrets.PROD_HOST }}/api/v1/health
+
