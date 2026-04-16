@@ -246,7 +246,6 @@ This artifact is downloaded by both the stage and production deploy jobs to retr
 | `AWS_REGION` | AWS region (e.g., `eu-central-1`) |
 | `ECR_REPOSITORY` | ECR repository name |
 | `AWS_ROLE_ARN` | IAM role ARN for OIDC authentication |
-| `AWS_ACCOUNT_ID` | AWS account ID for ECR registry URL |
 
 ### Environment: `stage`
 

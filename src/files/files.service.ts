@@ -80,7 +80,11 @@ export class FilesService {
 
   async completeUpload(fileId: string, user: AuthUser) {
     const file = await this.findByIdOrThrow(fileId);
-    this.assertOwnerOrStaff(file, user);
+    const isOwner = file.ownerUserId === user.sub;
+
+    if (!isOwner) {
+      throw new ForbiddenException('Access denied');
+    }
 
     if (file.status === FileStatus.READY) {
       return this.toPublicView(file);
