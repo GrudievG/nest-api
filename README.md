@@ -103,6 +103,46 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+
+## Homework 9:
+
+**Integrated domain:** Users (avatars), Products (main product image)
+
+### Upload Flow (presign → upload → complete)
+
+**1.  POST /files/presign**
+
+-  Validates authentication and permissions.
+-  Backend generates a secure S3 key (avatar/{userId}/{uuid}.jpg).
+-  Creates a FileRecord in pending status.
+-  Returns a presigned PUT URL for direct upload to S3.
+
+**2. Client Upload**
+
+- Client uploads the file directly to S3 using the presigned URL.
+- Backend does not proxy file bytes.
+
+**3. POST /files/complete**
+
+- Verifies file ownership.
+- Confirms object exists in S3.
+- Changes status from pending → ready.
+
+**4. PATCH /users/me/avatar**
+
+- Checks permissions
+- Attaches file to User.avatarFileId.
+
+### Access Control & Security
+
+- S3 bucket is private (Block Public Access enabled).
+- Object keys are generated only on the backend.
+- Users cannot upload to other user's prefixes.
+- Ownership is validated before completing upload.
+- File must be in pending state to be completed.
+- CloudFront uses Origin Access Control (OAC) to read from S3.
+- Direct S3 access returns AccessDenied.
+
 ## RabbitMQ Topology
 The application uses a **Work Queue** pattern to handle asynchronous order processing. This ensures high reliability and allows the system to scale horizontally by adding more worker instances.
 
