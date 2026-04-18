@@ -21,7 +21,13 @@ services:
       - AWS_S3_ENDPOINT=http://minio:9000
       - AWS_S3_FORCE_PATH_STYLE=true
       - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
-    command: npm run start:prod
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - RABBITMQ_PREFETCH=${RABBITMQ_PREFETCH}
+      - PAYMENTS_GRPC_URL=${PAYMENTS_GRPC_URL}
+      - PAYMENTS_GRPC_BIND_URL=${PAYMENTS_GRPC_BIND_URL}
+      - PAYMENTS_RPC_TIMEOUT_MS=${PAYMENTS_RPC_TIMEOUT_MS}
+      - PAYMENTS_RPC_MAX_RETRIES=${PAYMENTS_RPC_MAX_RETRIES}
+      - PAYMENTS_RPC_BACKOFF_MS=${PAYMENTS_RPC_BACKOFF_MS}
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,6 +145,9 @@ services:
     ports:
       - "5673:5672"
       - "15673:15672"
+    networks:
+      - internal
+      - public
 
   minio-init:
     image: minio/mc:latest

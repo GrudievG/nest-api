@@ -38,7 +38,7 @@ COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/proto ./proto
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "node dist/payments-service/main.js & node dist/main.js"]
 
 
 FROM gcr.io/distroless/nodejs20-debian12:nonroot AS prod-distroless
@@ -60,4 +60,4 @@ COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/proto ./proto
 COPY package*.json ./
 EXPOSE 3000
-CMD ["dist/main.js"]
+CMD ["sh", "-c", "node dist/payments-service/main.js & node dist/main.js"]
