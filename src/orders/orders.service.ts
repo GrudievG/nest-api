@@ -106,7 +106,7 @@ export class OrdersService {
         const order = orderRepository.create({
           userId: user.id,
           user,
-          status: OrderStatus.CREATED,
+          status: OrderStatus.PENDING,
           idempotencyKey: input.idempotencyKey,
         });
 
