@@ -13,7 +13,7 @@ import type { User } from '../../users/entities/user.entity';
 import type { OrderItem } from './order-item.entity';
 
 export enum OrderStatus {
-  CREATED = 'CREATED',
+  PENDING = 'PENDING',
   PROCESSED = 'PROCESSED',
   PAID = 'PAID',
   CANCELLED = 'CANCELLED',
@@ -39,7 +39,7 @@ export class Order {
     type: 'enum',
     enum: OrderStatus,
     enumName: 'orders_status_enum',
-    default: OrderStatus.CREATED,
+    default: OrderStatus.PENDING,
   })
   status: OrderStatus;
 
