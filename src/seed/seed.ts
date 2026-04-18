@@ -59,11 +59,11 @@ const usersSeed = [
 ];
 
 const productsSeed = [
-  { title: 'Coffee Mug', price: '12.90', isActive: true },
-  { title: 'Notebook', price: '6.50', isActive: true },
-  { title: 'Desk Lamp', price: '38.00', isActive: true },
-  { title: 'Mechanical Keyboard', price: '129.00', isActive: true },
-  { title: 'Wireless Mouse', price: '45.00', isActive: true },
+  { title: 'Coffee Mug', price: '12.90', isActive: true, stock: 10 },
+  { title: 'Notebook', price: '6.50', isActive: true, stock: 10 },
+  { title: 'Desk Lamp', price: '38.00', isActive: true, stock: 10 },
+  { title: 'Mechanical Keyboard', price: '129.00', isActive: true, stock: 10 },
+  { title: 'Wireless Mouse', price: '45.00', isActive: true, stock: 10 },
 ];
 
 const ordersSeed: SeedOrder[] = [

@@ -34,62 +34,6 @@ The folder structure proposed by NestJS promotes:
 ## Additional Features
 In my opinion, the use of **Decorators** is particularly noteworthy. They provide a clean and convenient way to implement cross-cutting concerns, such as validation or authorization, without cluttering the main business logic within the services.
 
-## Project setup
-
-### Development Workflow:
-
-Start environment:
-```bash
-docker compose -f compose.yaml -f compose.dev.yaml up --watch
-```
-
-Run Migrations:
-```bash
-docker compose -f compose.yaml -f compose.dev.yaml run --build --rm migrate
-```
-
-Run Seed:
-```bash
-docker compose -f compose.yaml -f compose.dev.yaml run --build --rm seed
-```
-
-Create MinIO Bucket:
-```bash
-docker compose -f compose.yaml -f compose.dev.yaml --profile tools up minio-init
-```
-
-### Production Mode:
-
-Start environment:
-```bash
-docker compose up --build
-```
-
-Run Migrations:
-```bash
-docker compose run --rm migrate
-```
-
-Run Seed:
-```bash
-docker compose run --rm seed
-```
-
-Create MinIO Bucket:
-```bash
-docker compose --profile tools up minio-init
-```
-
-### Distroless Runtime
-```bash
-docker compose --profile distroless up --build api-distroless
-```
-
-### Hardened Runtime
-```bash
-docker compose --profile hardened up --build api-hardened
-```
-
 ## Run tests
 
 ```bash
@@ -142,6 +86,131 @@ $ npm run test:cov
 - File must be in pending state to be completed.
 - CloudFront uses Origin Access Control (OAC) to read from S3.
 - Direct S3 access returns AccessDenied.
+
+## Homework 10:
+
+### Files added:
+
+- Dockerfile — multi-stage build (dev, build, prod, prod-distroless)
+- compose.yaml — production-like stack
+- compose.dev.yaml — development overrides
+- .dockerignore
+
+### Multi-Stage Dockerfile
+
+Implemented stages:
+
+- **dev** — full dependencies, Nest watch mode
+- **build** — TypeScript compilation
+- **prod** — minimal runtime, non-root
+- **prod-distroless** — hardened minimal runtime without shell
+
+Services:
+
+- **api** — NestJS backend
+- **postgres** — PostgreSQL 16 (internal network only)
+- **minio** — S3-compatible storage
+- **minio-init** — bucket provisioning (one-off)
+- **migrate** — DB migrations (one-off)
+- **seed** — DB seed (one-off)
+
+Networking:
+
+- internal network → DB & MinIO isolation
+- public network → API exposed on localhost
+
+### Project Setup
+
+**Development Workflow:**
+
+Start environment:
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up --watch
+```
+
+Run Migrations:
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml run --build --rm migrate
+```
+
+Run Seed:
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml run --build --rm seed
+```
+
+Create MinIO Bucket:
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml --profile tools up minio-init
+```
+
+**Production Mode:**
+
+Start environment:
+```bash
+docker compose up --build
+```
+
+Run Migrations:
+```bash
+docker compose run --rm migrate
+```
+
+Run Seed:
+```bash
+docker compose run --rm seed
+```
+
+Create MinIO Bucket:
+```bash
+docker compose --profile tools up minio-init
+```
+
+Distroless Runtime
+```bash
+docker compose --profile distroless up --build api-distroless
+```
+
+Hardened Runtime
+```bash
+docker compose --profile hardened up --build api-hardened
+```
+
+### Optimizations:
+
+**Containers size:**
+
+```bash
+docker build --target dev -t app:dev .
+docker build --target prod -t app:prod .
+docker build --target prod-distroless -t app:distroless .
+docker build --target prod-hardened -t app:hardened .
+docker image ls
+```
+<img width="659" height="91" alt="Снимок экрана 2026-03-07 в 14 41 27" src="https://github.com/user-attachments/assets/188b6a82-287c-4d31-9abb-09c4f3497fef" />
+
+**Containers layers:**
+
+```bash
+docker history app:prod
+docker history app:distroless
+```
+<img width="922" height="477" alt="Снимок экрана 2026-03-07 в 14 56 28" src="https://github.com/user-attachments/assets/4770fbbd-6bf4-4ecb-a562-e6c3d5e6308d" />
+
+
+**Distroless has:**
+
+- No package manager
+- No shell
+- Minimal OS surface
+- Smaller attack surface
+
+**Non-root check:**
+
+```bash
+docker compose up --build -d
+docker compose exec api id
+```
+<img width="475" height="40" alt="Снимок экрана 2026-03-07 в 15 01 20" src="https://github.com/user-attachments/assets/0bbd2616-239f-4b9b-a032-27ee0809504c" />
 
 ## RabbitMQ Topology
 The application uses a **Work Queue** pattern to handle asynchronous order processing. This ensures high reliability and allows the system to scale horizontally by adding more worker instances.
