@@ -55,11 +55,38 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private static retryDelayMs(attempt: number): number {
+    return 2000 * Math.pow(2, attempt - 1);
+  }
+
   private async assertInfrastructure(): Promise<void> {
     const ch = this.getChannel();
 
     await ch.assertQueue('orders.process', { durable: true });
     await ch.assertQueue('orders.dlq', { durable: true });
+
+    const maxRetries = 2;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await ch.assertQueue(`orders.retry.delay.${attempt}`, {
+        durable: true,
+        arguments: {
+          'x-message-ttl': RabbitmqService.retryDelayMs(attempt),
+          'x-dead-letter-exchange': '',
+          'x-dead-letter-routing-key': 'orders.process',
+        },
+      });
+    }
+  }
+
+  publishWithDelay(payload: unknown, attempt: number): boolean {
+    const queue = `orders.retry.delay.${attempt}`;
+    const ch = this.getChannel();
+    const body = Buffer.from(JSON.stringify(payload));
+
+    return ch.sendToQueue(queue, body, {
+      contentType: 'application/json',
+      persistent: true,
+    });
   }
 
   publishToQueue(
