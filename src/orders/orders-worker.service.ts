@@ -35,7 +35,10 @@ export class OrdersWorkerService implements OnApplicationBootstrap {
         msg.content.toString('utf-8'),
       ) as OrdersProcessMessage;
     } catch {
-      this.logger.warn('Invalid JSON payload, sending to DLQ');
+      this.logger.warn({
+        outcome: 'dlq',
+        reason: 'Invalid JSON payload',
+      });
       this.rabbitmqService.publishToQueue('orders.dlq', {
         raw: msg.content.toString('base64'),
       });
@@ -45,30 +48,44 @@ export class OrdersWorkerService implements OnApplicationBootstrap {
 
     const attempt = Number(payload.attempt ?? 1);
     const messageId = payload.messageId ?? '(missing)';
+    const orderId = payload.orderId;
+
+    let errorReason: string | undefined;
 
     try {
       await this.ordersService.processFromQueue({ ...payload, attempt });
+      this.logger.log({
+        outcome: 'success',
+        messageId,
+        orderId,
+        attempt,
+      });
       ch.ack(msg);
       return;
-    } catch {
-      this.logger.warn(
-        `Orders worker failed (messageId=${messageId}, orderId=${payload.orderId}, attempt=${attempt})`,
-      );
+    } catch (err) {
+      errorReason = (err as Error)?.message ?? String(err);
+      this.logger.warn({
+        outcome: attempt >= this.maxAttempts ? 'dlq' : 'retry',
+        messageId,
+        orderId,
+        attempt,
+        reason: errorReason,
+      });
     }
 
     if (attempt >= this.maxAttempts) {
       this.rabbitmqService.publishToQueue('orders.dlq', {
         ...payload,
         attempt,
+        failReason: errorReason,
       });
       ch.ack(msg);
       return;
     }
 
-    this.rabbitmqService.publishToQueue(
-      'orders.process',
-      { ...payload, attempt: attempt + 1 },
-      { messageId },
+    this.rabbitmqService.publishWithDelay(
+      { ...payload, attempt: attempt + 1, failReason: errorReason },
+      attempt,
     );
     ch.ack(msg);
   }

@@ -3,4 +3,5 @@ export type OrdersProcessMessage = {
   orderId: string;
   attempt: number;
   simulate?: 'alwaysFail';
+  failReason?: string;
 };
