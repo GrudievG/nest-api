@@ -80,13 +80,16 @@ export class PaymentsGrpcClient implements OnModuleInit {
 
   async authorize(payload: AuthorizeRequest): Promise<AuthorizeResponse> {
     const timeoutMs = Number(
-      this.configService.get<string>('PAYMENTS_RPC_TIMEOUT_MS') ?? '2500',
+      this.configService.get<string>('paymentsService.paymentsRPCTimeoutMs') ??
+        '2500',
     );
     const maxRetries = Number(
-      this.configService.get<string>('PAYMENTS_RPC_MAX_RETRIES') ?? '2',
+      this.configService.get<string>('paymentsService.paymentsPRCMaxRetries') ??
+        '2',
     );
     const baseBackoffMs = Number(
-      this.configService.get<string>('PAYMENTS_RPC_BACKOFF_MS') ?? '150',
+      this.configService.get<string>('paymentsService.paymentsPRCBackoffMs') ??
+        '150',
     );
 
     try {
@@ -123,7 +126,8 @@ export class PaymentsGrpcClient implements OnModuleInit {
 
   async getStatus(paymentId: string): Promise<GetPaymentStatusResponse> {
     const timeoutMs = Number(
-      this.configService.get<string>('PAYMENTS_RPC_TIMEOUT_MS') ?? '2500',
+      this.configService.get<string>('paymentsService.paymentsRPCTimeoutMs') ??
+        '2500',
     );
 
     try {
@@ -149,32 +153,26 @@ export class PaymentsGrpcClient implements OnModuleInit {
 
   private mapGrpcError(error: unknown): Error {
     const code = (error as { code?: number })?.code;
-    const details =
-      (error as { details?: string; message?: string })?.details ??
-      (error as { message?: string })?.message ??
-      'unknown grpc error';
 
     const errorMap = {
       [GrpcStatus.INVALID_ARGUMENT]: new BadRequestException(
-        `Payments validation failed: ${details}`,
+        'Payments validation failed',
       ),
-      [GrpcStatus.NOT_FOUND]: new NotFoundException(
-        `Payment not found: ${details}`,
-      ),
+      [GrpcStatus.NOT_FOUND]: new NotFoundException('Payment not found'),
       [GrpcStatus.FAILED_PRECONDITION]: new ConflictException(
-        `Payment cannot be processed now: ${details}`,
+        'Payment cannot be processed now',
       ),
       [GrpcStatus.DEADLINE_EXCEEDED]: new GatewayTimeoutException(
-        `Payments timeout: ${details}`,
+        'Payments timeout',
       ),
       [GrpcStatus.UNAVAILABLE]: new ServiceUnavailableException(
-        `Payments temporarily unavailable: ${details}`,
+        'Payments temporarily unavailable',
       ),
     };
 
     return (
       errorMap[code as keyof typeof errorMap] ??
-      new BadGatewayException(`Payments RPC call failed: ${details}`)
+      new BadGatewayException('Payments RPC call failed')
     );
   }
 }

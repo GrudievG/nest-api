@@ -6,11 +6,14 @@ import { PaymentsGrpcModule } from './payments.grpc.module';
 import { PAYMENTS_PACKAGE_NAME } from '../common/grpc.constants';
 
 async function bootstrap() {
-  const configService = new ConfigService();
+  const app = await NestFactory.createApplicationContext(PaymentsGrpcModule);
+  const configService = app.get(ConfigService);
   const url = configService.get<string>(
-    'PAYMENTS_GRPC_BIND_URL',
+    'paymentsService.paymentsGRPCBindUrl',
     '0.0.0.0:5021',
   );
+  await app.close();
+
   const grpc = await NestFactory.createMicroservice<MicroserviceOptions>(
     PaymentsGrpcModule,
     {

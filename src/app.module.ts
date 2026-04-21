@@ -24,13 +24,21 @@ import { FilesModule } from './files/files.module';
 import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import { DebugModule } from './debug/debug.module';
 import rabbitmqConfig from './config/rabbitmq.config';
+import paymentsServiceConfig from './config/payments-service.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       skipProcessEnv: true,
-      load: [appConfig, databaseConfig, authConfig, awsConfig, rabbitmqConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        authConfig,
+        awsConfig,
+        rabbitmqConfig,
+        paymentsServiceConfig,
+      ],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],

@@ -34,7 +34,7 @@ import { join } from 'path';
             package: PAYMENTS_PACKAGE_NAME,
             protoPath: join(process.cwd(), 'proto/payments.proto'),
             url: configService.get<string>(
-              'PAYMENTS_GRPC_URL',
+              'paymentsService.paymentsGRPCUrl',
               'localhost:5021',
             ),
           },
