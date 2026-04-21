@@ -296,3 +296,105 @@ The RabbitMQ topology is tightly coupled with the database state to achieve Exac
    "messageId": "rder ID of created order from the previous step",
    "attempt": 1,
    }```. Since we already have entry in the `processed_messages` table with existing orderId as messageId and we have unique constraint on this column, it will not be inserted again. 
+
+## Homework 14:
+
+### Environment setup:
+
+**To run main app:**
+
+1. Run the environment with `docker compose up --build`. It's possible to use `compose.local.yaml` file. It will start Postgres, Minio and RabbitMQ containers.
+2. Run migrations and seed data. (`npm run db:migrate`, `npm run db:seed`)
+3. Copy .env.example file and paste values
+4. Then start api locally using `npm run start`
+
+**To run payments service:**
+```
+start:payments:dev
+```
+
+**Go through happy path:**
+Authenticate with admin credentials. Endpoint: `POST {{base_url}}/api/v1/auth/login` Request body: `{ email: 'admin@example.com', password: 'password123' }`
+Create an order
+URL: `POST {{base_url}}/api/v1/orders`
+Request body:
+```JSON
+{
+    "items": [
+        {
+            "productId": "9e9272e0-6143-4c16-aac6-b65c8a354862", 
+            "quantity": 3
+        },
+        {
+            "productId": "3af2a9b6-8982-4641-9b5b-5a5e272dd3bf",
+            "quantity": 2
+        }
+    ],
+    "idempotencyKey": "newKey"
+}
+```
+Get `id` from the response
+
+Make a request to pay order:
+`POST {{base_url}}/api/v1/orders/{{orderId}}/pay
+Request body:
+```JSON
+{
+    "amount": "10.15",
+    "currency": "USD",
+    "idempotencyKey": "newKey"
+}
+```
+
+Check paymentId in the response.
+
+Make the same request with the same request body (the same `idempotencyKey`)
+
+Check paymentId again.
+
+Make the same request with changed `idempotencyKey`
+
+Check paymentId
+
+### Proto contract:
+Proto contract file is placed in the project root.
+
+In the main app `PAYMENTS_GRPC_CLIENT` is registered in the Orders module and proto file is connected during registration of client.
+
+```
+ClientsModule.registerAsync([
+      {
+        name: 'PAYMENTS_GRPC_CLIENT',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: PAYMENTS_PACKAGE_NAME,
+            protoPath: join(process.cwd(), 'proto/payments.proto'),
+            url: configService.get<string>(
+              'PAYMENTS_GRPC_URL',
+              'localhost:5021',
+            ),
+          },
+        }),
+      },
+    ]),
+```
+
+In the payments service proto file is connected during microservice creation
+```
+const grpc = await NestFactory.createMicroservice<MicroserviceOptions>(
+    PaymentsGrpcModule,
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: PAYMENTS_PACKAGE_NAME,
+        protoPath: join(process.cwd(), 'proto/payments.proto'),
+        url,
+      },
+    },
+  );
+
+  await grpc.listen();
+```
