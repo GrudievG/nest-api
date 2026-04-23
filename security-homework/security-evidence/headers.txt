@@ -1,0 +1,53 @@
+## Security Headers Evidence
+## Captured: 2026-04-22
+## Command: curl -si http://localhost:4000/api/v1/auth/login -X POST -H "Content-Type: application/json" -d '{"email":"x","password":"x"}'
+
+HTTP/1.1 400 Bad Request
+Content-Security-Policy: default-src 'self';script-src 'self' 'unsafe-inline';style-src 'self' 'unsafe-inline';img-src 'self' data: https:;connect-src 'self';font-src 'self' https: data:;object-src 'none';upgrade-insecure-requests;base-uri 'self';form-action 'self';frame-ancestors 'self';script-src-attr 'none'
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Vary: Origin
+Access-Control-Allow-Credentials: true
+x-request-id: a17b98ef-6adf-4e83-a714-c2ad1298785e
+X-RateLimit-Limit-global: 100
+X-RateLimit-Remaining-global: 99
+X-RateLimit-Reset-global: 60
+X-RateLimit-Limit-strict: 5
+X-RateLimit-Remaining-strict: 4
+X-RateLimit-Reset-strict: 60
+Content-Type: application/json; charset=utf-8
+Date: Wed, 22 Apr 2026 18:27:29 GMT
+Connection: keep-alive
+
+{"statusCode":400,"requestId":"a17b98ef-6adf-4e83-a714-c2ad1298785e","timestamp":"2026-04-22T18:27:29.025Z","path":"/api/v1/auth/login","error":{"message":["email must be an email","password must be longer than or equal to 8 characters"],"error":"Bad Request","statusCode":400}}
+
+---
+
+## Key Headers Explained
+
+Content-Security-Policy     — restricts script/style/image/connect origins; 'none' for object-src
+Cross-Origin-Opener-Policy  — isolates browsing context (mitigates Spectre)
+Cross-Origin-Resource-Policy— prevents cross-origin reads of responses
+Referrer-Policy             — no-referrer: URL not leaked in Referer header
+Strict-Transport-Security   — HSTS, forces HTTPS for 1 year with subdomains
+X-Content-Type-Options      — nosniff: prevents MIME-type sniffing
+X-Frame-Options             — SAMEORIGIN: prevents clickjacking
+X-XSS-Protection            — 0: disabled; modern browsers rely on CSP instead
+X-RateLimit-Limit-global    — global policy bucket: 100 req/60s
+X-RateLimit-Limit-strict    — strict policy bucket: 5 req/60s (on this endpoint)
+x-request-id                — correlation ID for log tracing
+Access-Control-Allow-Credentials — CORS credentials allowed (origin-restricted)
+
+## Source: src/main.ts
+## helmet() is applied before CORS and route handlers.
+## trust proxy: 1 is set so req.ip reads real client IP from X-Forwarded-For.
+

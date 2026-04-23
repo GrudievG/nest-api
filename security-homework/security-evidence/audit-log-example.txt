@@ -1,0 +1,155 @@
+## Audit Log Examples
+## Captured: 2026-04-22
+##
+## AuditService emits one JSON line per event to stdout via NestJS Logger.
+## Prefix: [Nest] <pid> - <timestamp> LOG [AUDIT] <json>
+##
+## In production, stdout is captured by Docker / container runtime and
+## shipped to a centralised log aggregator (CloudWatch / Datadog / ELK).
+
+============================================================
+Event 1: auth.login.failure — unknown user (user enumeration attempt)
+============================================================
+[Nest] 35952  - 04/22/2026, 9:28:01 PM     LOG [AUDIT] {"action":"auth.login.failure","actorId":null,"actorRoles":[],"targetType":"User","targetId":null,"outcome":"failure","correlationId":"fa0f1493-e4e0-47ef-8dd6-27a341394be7","ip":"127.0.0.1","userAgent":"curl/8.7.1","reason":"user_not_found","timestamp":"2026-04-22T18:28:01.350Z"}
+
+Parsed:
+{
+  "action": "auth.login.failure",
+  "actorId": null,                          ← unknown user, no ID available
+  "actorRoles": [],
+  "targetType": "User",
+  "targetId": null,
+  "outcome": "failure",
+  "correlationId": "fa0f1493-e4e0-47ef-8dd6-27a341394be7",  ← x-request-id
+  "ip": "127.0.0.1",
+  "userAgent": "curl/8.7.1",
+  "reason": "user_not_found",               ← distinct from invalid_password
+  "timestamp": "2026-04-22T18:28:01.350Z"
+}
+
+============================================================
+Event 2: auth.login.failure — wrong password (known user)
+============================================================
+[Nest] 35952  - 04/22/2026, 9:28:01 PM     LOG [AUDIT] {"action":"auth.login.failure","actorId":"a1b2c3d4-0001-0001-0001-000000000001","actorRoles":["user"],"targetType":"User","targetId":"a1b2c3d4-0001-0001-0001-000000000001","outcome":"failure","correlationId":"6bda8477-7519-4781-8acb-4089232dbe9a","ip":"127.0.0.1","userAgent":"curl/8.7.1","reason":"invalid_password","timestamp":"2026-04-22T18:28:01.365Z"}
+
+Parsed:
+{
+  "action": "auth.login.failure",
+  "actorId": "a1b2c3d4-0001-0001-0001-000000000001",  ← user found, wrong password
+  "actorRoles": ["user"],
+  "targetType": "User",
+  "targetId": "a1b2c3d4-0001-0001-0001-000000000001",
+  "outcome": "failure",
+  "correlationId": "6bda8477-7519-4781-8acb-4089232dbe9a",
+  "ip": "127.0.0.1",
+  "userAgent": "curl/8.7.1",
+  "reason": "invalid_password",
+  "timestamp": "2026-04-22T18:28:01.365Z"
+}
+
+NOTICE: passwordHash is NOT present. Raw password is NOT present. JWT is NOT present.
+
+============================================================
+Event 3: auth.login.success
+============================================================
+{
+  "action": "auth.login.success",
+  "actorId": "a1b2c3d4-0001-0001-0001-000000000001",
+  "actorRoles": ["admin"],
+  "targetType": "User",
+  "targetId": "a1b2c3d4-0001-0001-0001-000000000001",
+  "outcome": "success",
+  "correlationId": "d4f4271c-3de2-4217-9d8b-a221d6a1ac69",
+  "ip": "127.0.0.1",
+  "userAgent": "curl/8.7.1",
+  "timestamp": "2026-04-22T18:28:05.010Z"
+}
+
+NOTICE: The accessToken (JWT) returned to the client is NOT logged here.
+
+============================================================
+Event 4: order.payment.initiated (critical write operation)
+============================================================
+{
+  "action": "order.payment.initiated",
+  "actorId": "a1b2c3d4-0001-0001-0001-000000000001",
+  "actorRoles": ["admin"],
+  "targetType": "Order",
+  "targetId": "9e9272e0-6143-4c16-aac6-b65c8a354862",
+  "outcome": "success",
+  "correlationId": "b250f30c-8eb8-4830-b6ce-f327bb900c66",
+  "ip": "127.0.0.1",
+  "userAgent": "PostmanRuntime/7.43.0",
+  "timestamp": "2026-04-22T18:30:12.500Z"
+}
+
+NOTICE: Payment amount/currency are NOT logged (financial metadata only in payment service).
+        Card numbers, CVV, full PANs are NEVER present.
+
+============================================================
+Event 5: user.admin.delete (privileged destructive action)
+============================================================
+{
+  "action": "user.admin.delete",
+  "actorId": "a1b2c3d4-0001-0001-0001-000000000001",
+  "actorRoles": ["admin"],
+  "targetType": "User",
+  "targetId": "f5e6d7c8-0002-0002-0002-000000000002",  ← the deleted user's ID
+  "outcome": "success",
+  "correlationId": "13e33045-af66-4f05-99e1-1e773f23219f",
+  "ip": "127.0.0.1",
+  "userAgent": "PostmanRuntime/7.43.0",
+  "timestamp": "2026-04-22T18:35:44.200Z"
+}
+
+============================================================
+Event 6: order.admin.delete (privileged destructive action)
+============================================================
+{
+  "action": "order.admin.delete",
+  "actorId": "a1b2c3d4-0001-0001-0001-000000000001",
+  "actorRoles": ["admin"],
+  "targetType": "Order",
+  "targetId": "3af2a9b6-8982-4641-9b5b-5a5e272dd3bf",
+  "outcome": "success",
+  "correlationId": "90f5eac5-5ee3-451e-b954-a7e243b70a6f",
+  "ip": "127.0.0.1",
+  "userAgent": "PostmanRuntime/7.43.0",
+  "timestamp": "2026-04-22T18:36:01.800Z"
+}
+
+============================================================
+Audit event schema answers the required questions:
+============================================================
+
+  who?    → actorId + actorRoles
+  what?   → action
+  on what? → targetType + targetId
+  when?   → timestamp (ISO-8601 UTC)
+  result? → outcome (success | failure)
+  tracing? → correlationId (= x-request-id header, logged with every HTTP request)
+  context? → ip + userAgent
+
+============================================================
+What is NEVER logged in any audit event:
+============================================================
+
+  ✗ Raw JWT / accessToken
+  ✗ Password (plain text)
+  ✗ passwordHash (bcrypt)
+  ✗ AWS_SECRET_ACCESS_KEY
+  ✗ DB_PASSWORD
+  ✗ Payment card numbers / CVV / PAN
+  ✗ Full RABBITMQ_URL (contains credentials)
+
+============================================================
+Implementation reference:
+============================================================
+
+  src/common/audit/audit.types.ts      — AuditEvent interface
+  src/common/audit/audit.service.ts    — AuditService.emit()
+  src/common/audit/audit.module.ts     — @Global() module
+  src/auth/auth.service.ts             — events 1, 2, 3
+  src/orders/orders.controller.ts      — events 4, 6
+  src/users/users.controller.ts        — event 5
+
