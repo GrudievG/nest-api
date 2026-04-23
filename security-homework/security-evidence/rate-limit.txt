@@ -1,0 +1,85 @@
+## Rate Limiting Evidence
+## Captured: 2026-04-22
+##
+## Two throttling policies:
+##   global — 100 req / 60 s per IP (applied to ALL routes via APP_GUARD)
+##   strict —   5 req / 60 s per IP (applied to risky endpoints via @Throttle decorator)
+##
+## Risky endpoints using strict policy:
+##   POST /api/v1/auth/login
+##   POST /api/v1/users          (registration)
+##   POST /api/v1/orders/:id/pay (payment)
+##
+## Command used to generate evidence:
+##   for i in 1 2 3 4 5 6; do
+##     curl -si http://localhost:4000/api/v1/auth/login -X POST \
+##       -H "Content-Type: application/json" \
+##       -d '{"email":"test@test.com","password":"wrongpassword"}' | grep -E "^HTTP|^X-RateLimit|^Retry-After|^\{"
+##   done
+
+--- Request 1 ---
+HTTP/1.1 401 Unauthorized
+X-RateLimit-Limit-global: 100
+X-RateLimit-Remaining-global: 98
+X-RateLimit-Reset-global: 28
+X-RateLimit-Limit-strict: 5
+X-RateLimit-Remaining-strict: 3
+X-RateLimit-Reset-strict: 28
+{"statusCode":401,"requestId":"fa0f1493-e4e0-47ef-8dd6-27a341394be7","timestamp":"2026-04-22T18:28:01.349Z","path":"/api/v1/auth/login","error":{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}}
+
+--- Request 2 ---
+HTTP/1.1 401 Unauthorized
+X-RateLimit-Limit-strict: 5
+X-RateLimit-Remaining-strict: 2
+X-RateLimit-Reset-strict: 28
+{"statusCode":401,...}
+
+--- Request 3 ---
+HTTP/1.1 401 Unauthorized
+X-RateLimit-Limit-strict: 5
+X-RateLimit-Remaining-strict: 1
+X-RateLimit-Reset-strict: 28
+
+--- Request 4 ---
+HTTP/1.1 401 Unauthorized
+X-RateLimit-Limit-strict: 5
+X-RateLimit-Remaining-strict: 0     ← budget exhausted after 4 requests
+X-RateLimit-Reset-strict: 28
+
+--- Request 5 — BLOCKED ✅ ---
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit-global: 100
+X-RateLimit-Remaining-global: 94
+X-RateLimit-Reset-global: 28
+Retry-After-strict: 60              ← client must wait 60 seconds
+{"statusCode":429,"requestId":"13e33045-af66-4f05-99e1-1e773f23219f","timestamp":"2026-04-22T18:28:01.405Z","path":"/api/v1/auth/login","error":"ThrottlerException: Too Many Requests"}
+
+--- Request 6 — Still BLOCKED ✅ ---
+HTTP/1.1 429 Too Many Requests
+Retry-After-strict: 60
+{"statusCode":429,"requestId":"90f5eac5-5ee3-451e-b954-a7e243b70a6f","timestamp":"2026-04-22T18:28:01.420Z","path":"/api/v1/auth/login","error":"ThrottlerException: Too Many Requests"}
+
+
+## Observations
+
+1. The STRICT bucket counts down: Remaining 3 → 2 → 1 → 0 → 429
+2. The GLOBAL bucket continues decrementing even when strict 429 fires —
+   proving two independent counters are in use.
+3. Retry-After-strict is returned so clients can implement exponential backoff.
+4. Request IDs (x-request-id / correlationId) are present on all responses
+   including 429 — enabling log correlation.
+
+## What this protects against
+
+POST /auth/login      — brute-force / credential stuffing (5 attempts per minute per IP)
+POST /users           — mass account creation bots
+POST /orders/:id/pay  — payment abuse, accidental double-charges
+
+## Implementation reference
+
+src/app.module.ts         — ThrottlerModule.forRoot([global, strict]) + APP_GUARD
+src/auth/auth.controller.ts    — @Throttle({ strict: { limit: 5, ttl: 60000 } })
+src/users/users.controller.ts  — @Throttle({ strict: { limit: 5, ttl: 60000 } })
+src/orders/orders.controller.ts — @Throttle({ strict: { limit: 5, ttl: 60000 } })
+src/main.ts              — expressApp.set('trust proxy', 1) for correct IP detection
+

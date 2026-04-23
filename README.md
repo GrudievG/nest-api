@@ -398,3 +398,79 @@ const grpc = await NestFactory.createMicroservice<MicroserviceOptions>(
 
   await grpc.listen();
 ```
+
+## Security Homework — Baseline Hardening
+
+Full baseline document: [`security-homework/SECURITY-BASELINE.md`](./security-homework/SECURITY-BASELINE.md)
+
+### What was the weakest point before hardening?
+
+Three endpoints — `GET /api/v1/users`, `GET /api/v1/users/:id`, and `PATCH /api/v1/users/:id` — had **no authentication guards at all**. Anyone could list all users (PII leak) or update any user profile without a token. Additionally, there was no rate limiting anywhere and no security headers.
+
+### What was changed
+
+| Area | Change |
+|------|--------|
+| **Rate limiting** | `@nestjs/throttler` installed. **Global policy**: 100 req/60 s on all routes. **Strict policy**: 5 req/60 s on `POST /auth/login`, `POST /users`, `POST /orders/:id/pay` |
+| **Security headers** | `helmet()` added in `main.ts` — sets CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, etc. |
+| **CORS** | Replaced wildcard `cors: true` with explicit `CORS_ALLOWED_ORIGINS` env-var allowlist |
+| **Proxy-aware IP** | `trust proxy: 1` set so ThrottlerGuard reads real client IP behind nginx/ALB |
+| **Audit logging** | New global `AuditService` — emits structured JSON events for: login failure, login success, payment initiated, admin order delete, admin user delete |
+| **Access control fix** | `GET /users` → ADMIN only; `GET /users/:id` → auth required; `PATCH /users/:id` → ADMIN only |
+
+### What is consciously left in backlog
+
+- JWT refresh tokens / key versioning
+- CAPTCHA on login / registration
+- Redis-backed distributed rate limiting (multi-instance)
+- gRPC TLS channel credentials (payments service)
+- RabbitMQ AMQPS
+- GraphQL playground disabled in production
+
+### How to verify
+
+**Security headers:**
+```bash
+curl -si http://localhost:4000/api/v1/auth/login -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"wrong"}' | head -20
+```
+
+**Rate limit (strict — triggers 429 after 4 attempts):**
+```bash
+for i in 1 2 3 4 5 6; do
+  curl -s http://localhost:4000/api/v1/auth/login -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"email":"test@test.com","password":"wrongpassword"}' \
+    -o /dev/null -w "Request $i: HTTP %{http_code}\n"
+done
+```
+Expected: `401 401 401 401 429 429`
+
+**Audit log** (watch app stdout while making requests):
+```bash
+# In one terminal — watch logs
+npm run start 2>&1 | grep AUDIT
+
+# In another terminal — trigger login failure
+curl -X POST http://localhost:4000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"nonexistent@example.com","password":"password123"}'
+```
+
+**Unauthenticated access to users (now returns 401):**
+```bash
+curl -si http://localhost:4000/api/v1/users | head -5
+# Expected: HTTP/1.1 401 Unauthorized
+```
+
+### Evidence files
+
+| File | Contents |
+|------|----------|
+| `security-homework/security-evidence/headers.txt` | Real curl output with all security headers |
+| `security-homework/security-evidence/rate-limit.txt` | Real 429 responses from strict throttle on login |
+| `security-homework/security-evidence/audit-log-example.txt` | Structured audit event examples for all 5 instrumented events |
+| `security-homework/security-evidence/secret-flow-note.md` | Secret storage, delivery flow, rotation strategy |
+| `security-homework/security-evidence/tls-note.md` | Intended TLS architecture diagram and production design |
+

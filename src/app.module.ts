@@ -4,8 +4,11 @@ import {
   NestModule,
   RequestMethod,
 } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { AuditModule } from './common/audit/audit.module';
 import { AppController } from './app.controller';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -28,6 +31,18 @@ import paymentsServiceConfig from './config/payments-service.config';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      {
+        name: 'global',
+        ttl: 60000,
+        limit: 100,
+      },
+      {
+        name: 'strict',
+        ttl: 60000,
+        limit: 5,
+      },
+    ]),
     ConfigModule.forRoot({
       isGlobal: true,
       skipProcessEnv: true,
@@ -64,9 +79,16 @@ import paymentsServiceConfig from './config/payments-service.config';
     FilesModule,
     RabbitmqModule,
     DebugModule,
+    AuditModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

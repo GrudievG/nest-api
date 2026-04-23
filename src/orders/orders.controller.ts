@@ -12,6 +12,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from './entities/order.entity';
@@ -29,6 +30,9 @@ import {
 } from './payments-grpc.client';
 import { AuthorizeOrderDto } from './dto/authorize-order.dto';
 import { randomUUID } from 'node:crypto';
+import { AuditService } from '../common/audit/audit.service';
+import type { RequestWithId } from '../common/middleware/request-id.middleware';
+import type { Request } from 'express';
 
 @UseGuards(JwtAuthGuard, RolesGuard, ScopesGuard)
 @Controller({ path: 'orders', version: '1' })
@@ -36,6 +40,7 @@ export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly paymentsGrpcClient: PaymentsGrpcClient,
+    private readonly auditService: AuditService,
   ) {}
 
   @Roles(UserRole.USER, UserRole.ADMIN)
@@ -116,23 +121,54 @@ export class OrdersController {
 
   @Roles(UserRole.ADMIN)
   @Delete(':id')
-  async remove(@Param('id') id: string) {
+  async remove(
+    @Param('id') id: string,
+    @Req() req: Request & { user?: AuthUser } & Partial<RequestWithId>,
+  ) {
+    const actor = req.user as AuthUser;
     const deleted = await this.ordersService.delete(id);
 
     if (!deleted) {
       throw new NotFoundException('Order not found');
     }
 
+    this.auditService.emit({
+      action: 'order.admin.delete',
+      actorId: actor.sub,
+      actorRoles: actor.roles,
+      targetType: 'Order',
+      targetId: id,
+      outcome: 'success',
+      correlationId: req.requestId ?? 'unknown',
+      ip: req.ip,
+      userAgent: req.headers?.['user-agent'],
+    });
+
     return { ok: true };
   }
 
+  @Throttle({ strict: { limit: 5, ttl: 60000 } })
   @Post(':orderId/pay')
   async payOrder(
     @Param('orderId', ParseUUIDPipe) orderId: string,
-    @Req() req: Request & { user?: AuthUser },
+    @Req() req: Request & { user?: AuthUser } & Partial<RequestWithId>,
     @Body() dto: AuthorizeOrderDto,
   ): Promise<AuthorizeResponse> {
-    const userId = (req.user as AuthUser).sub;
+    const actor = req.user as AuthUser;
+    const userId = actor.sub;
+
+    this.auditService.emit({
+      action: 'order.payment.initiated',
+      actorId: userId,
+      actorRoles: actor.roles,
+      targetType: 'Order',
+      targetId: orderId,
+      outcome: 'success',
+      correlationId: req.requestId ?? 'unknown',
+      ip: req.ip,
+      userAgent: req.headers?.['user-agent'],
+    });
+
     return this.paymentsGrpcClient.authorize({
       orderId,
       userId,
