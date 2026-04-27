@@ -8,11 +8,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { AuthUser } from '../auth/types';
-import { FileRecord, FileStatus } from './file-record.entity';
+import { FileRecord, FileEntityType, FileStatus } from './file-record.entity';
 import { PresignFileDto } from './dto/presign-file.dto';
+import { CompleteUploadDto } from './dto/complete-upload.dto';
 import { S3Service } from './s3.service';
 import { AllowedContentType, FileKind } from './types';
-import { UserRole } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
+import { Product } from '../products/entities/product.entity';
 
 export const ALLOWED_CONTENT_TYPES = [
   'image/jpeg',
@@ -33,6 +35,10 @@ export class FilesService {
   constructor(
     @InjectRepository(FileRecord)
     private readonly filesRepository: Repository<FileRecord>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    @InjectRepository(Product)
+    private readonly productsRepository: Repository<Product>,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -78,7 +84,7 @@ export class FilesService {
     };
   }
 
-  async completeUpload(fileId: string, user: AuthUser) {
+  async completeUpload(fileId: string, user: AuthUser, dto: CompleteUploadDto) {
     const file = await this.findByIdOrThrow(fileId);
     const isOwner = file.ownerUserId === user.sub;
 
@@ -97,8 +103,33 @@ export class FilesService {
 
     file.status = FileStatus.READY;
     file.completedAt = new Date();
-    const saved = await this.filesRepository.save(file);
 
+    const kind = this.extractKindFromObjectKey(file.objectKey);
+
+    if (kind === 'avatar') {
+      await this.usersRepository.update(user.sub, { avatarFileId: file.id });
+      file.entityType = FileEntityType.USER;
+      file.entityId = user.sub;
+    } else if (kind === 'product-image') {
+      if (!dto.entityId) {
+        throw new BadRequestException(
+          'entityId (productId) is required for product-image',
+        );
+      }
+      const product = await this.productsRepository.findOne({
+        where: { id: dto.entityId },
+      });
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+      await this.productsRepository.update(dto.entityId, {
+        mainImageFileId: file.id,
+      });
+      file.entityType = FileEntityType.PRODUCT;
+      file.entityId = dto.entityId;
+    }
+
+    const saved = await this.filesRepository.save(file);
     return this.toPublicView(saved);
   }
 
@@ -221,5 +252,13 @@ export class FilesService {
       updatedAt: file.updatedAt,
       publicUrl: this.s3Service.buildPublicUrl(file.objectKey),
     };
+  }
+
+  private extractKindFromObjectKey(objectKey: string): FileKind | null {
+    const segment = objectKey.split('/')[0];
+    if (segment === 'avatar' || segment === 'product-image') {
+      return segment as FileKind;
+    }
+    return null;
   }
 }

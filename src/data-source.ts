@@ -12,6 +12,7 @@ import { AddProductImageRelation1771966821516 } from './migrations/1771966821516
 import { CreateProcessedMessageEntity1773258734771 } from './migrations/1773258734771-CreateProcessedMessageEntity';
 import { EnableUuidExtension1600000000000 } from './migrations/1600000000000-EnableUuidExtension';
 import { ChangeOrderStatusEnum1776538008081 } from './migrations/1776538008081-ChangeOrderStatusEnum';
+import { AddFileRecordEntityMetadata1777322013970 } from './migrations/1777322013970-AddFileRecordEntityMetadata';
 
 const appDataSource = new DataSource({
   type: 'postgres',
@@ -34,6 +35,7 @@ const appDataSource = new DataSource({
     AddProductImageRelation1771966821516,
     CreateProcessedMessageEntity1773258734771,
     ChangeOrderStatusEnum1776538008081,
+    AddFileRecordEntityMetadata1777322013970,
   ],
   synchronize: false,
 });
