@@ -20,6 +20,11 @@ export enum FileVisibility {
   PUBLIC = 'public',
 }
 
+export enum FileEntityType {
+  USER = 'user',
+  PRODUCT = 'product',
+}
+
 @Entity('files')
 @Index('UQ_files_object_key', ['objectKey'], { unique: true })
 export class FileRecord {
@@ -61,6 +66,17 @@ export class FileRecord {
 
   @Column({ type: 'timestamptz', name: 'completed_at', nullable: true })
   completedAt: Date | null;
+
+  @Column({
+    type: 'enum',
+    enum: FileEntityType,
+    name: 'entity_type',
+    nullable: true,
+  })
+  entityType: FileEntityType | null;
+
+  @Column({ type: 'uuid', name: 'entity_id', nullable: true })
+  entityId: string | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
