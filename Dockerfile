@@ -48,8 +48,9 @@ COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/proto ./proto
 COPY package*.json ./
+COPY launcher.js ./
 EXPOSE 3000
-CMD ["dist/main.js"]
+CMD ["launcher.js"]
 
 
 FROM dhi.io/node:24-alpine3.22 AS prod-hardened
