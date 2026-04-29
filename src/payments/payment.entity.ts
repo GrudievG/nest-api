@@ -39,6 +39,14 @@ export class Payment {
   })
   status: PaymentStatus;
 
+  @Column({
+    type: 'varchar',
+    length: 100,
+    name: 'provider_payment_id',
+    nullable: true,
+  })
+  providerPaymentId: string | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 

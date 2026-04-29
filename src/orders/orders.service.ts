@@ -15,6 +15,17 @@ import { ListOrdersDto } from './dto/list-orders.dto';
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 import { OrdersProcessMessage } from './orders-queue.types';
 import { ProcessedMessage } from '../idempotency/processed-message.entity';
+import { Payment, PaymentStatus } from '../payments/payment.entity';
+import { PaymentsGrpcClient, AuthorizeResponse } from './payments-grpc.client';
+
+export interface PayOrderInput {
+  userId: string;
+  amount: string;
+  currency: string;
+  idempotencyKey: string;
+  paymentMethod?: string;
+  simulateUnavailableOnce?: boolean;
+}
 
 @Injectable()
 export class OrdersService {
@@ -26,7 +37,10 @@ export class OrdersService {
     private readonly productsRepository: Repository<Product>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Payment)
+    private readonly paymentsRepository: Repository<Payment>,
     private readonly rabbitmqService: RabbitmqService,
+    private readonly paymentsGrpcClient: PaymentsGrpcClient,
   ) {}
 
   async create(userId: string, input: CreateOrderDto) {
@@ -171,6 +185,77 @@ export class OrdersService {
 
       throw error;
     }
+  }
+
+  async payOrder(
+    orderId: string,
+    input: PayOrderInput,
+  ): Promise<AuthorizeResponse> {
+    const order = await this.ordersRepository.findOne({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new ConflictException('Order is cancelled and cannot be paid');
+    }
+
+    if (order.status === OrderStatus.PAID) {
+      const existing = await this.paymentsRepository.findOne({
+        where: { orderId },
+      });
+      if (existing) {
+        return {
+          paymentId: existing.providerPaymentId ?? existing.id,
+          status: 'PAYMENT_STATUS_AUTHORIZED',
+          message: 'Already paid',
+        };
+      }
+    }
+
+    const result = await this.paymentsGrpcClient.authorize({
+      orderId,
+      userId: input.userId,
+      total: { amount: input.amount, currency: input.currency },
+      idempotencyKey: input.idempotencyKey,
+      paymentMethod: input.paymentMethod,
+      simulateUnavailableOnce: input.simulateUnavailableOnce,
+    });
+
+    const savedPayment = await this.dataSource.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+      const paymentRepo = manager.getRepository(Payment);
+
+      const existing = await paymentRepo.findOne({ where: { orderId } });
+
+      let payment: Payment;
+      if (existing) {
+        existing.status = PaymentStatus.PAID;
+        existing.providerPaymentId = result.paymentId;
+        payment = await paymentRepo.save(existing);
+      } else {
+        payment = await paymentRepo.save(
+          paymentRepo.create({
+            orderId,
+            status: PaymentStatus.PAID,
+            providerPaymentId: result.paymentId,
+          }),
+        );
+      }
+
+      order.status = OrderStatus.PAID;
+      await orderRepo.save(order);
+
+      return payment;
+    });
+
+    return {
+      ...result,
+      paymentId: savedPayment.providerPaymentId ?? savedPayment.id,
+    };
   }
 
   async processFromQueue(message: OrdersProcessMessage): Promise<void> {

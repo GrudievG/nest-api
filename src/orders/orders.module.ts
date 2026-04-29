@@ -13,6 +13,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PAYMENTS_PACKAGE_NAME } from '../common/grpc.constants';
 import { join } from 'path';
+import { Payment } from '../payments/payment.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { join } from 'path';
       Product,
       User,
       ProcessedMessage,
+      Payment,
     ]),
     ClientsModule.registerAsync([
       {
