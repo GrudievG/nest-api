@@ -125,7 +125,7 @@ Networking:
 
 Start environment:
 ```bash
-docker compose -f compose.yaml -f compose.dev.yaml up --watch
+docker compose -f compose.yaml -f compose.dev.yaml up
 ```
 
 Run Migrations:

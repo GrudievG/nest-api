@@ -5,14 +5,14 @@ services:
       target: prod
     restart: unless-stopped
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-rd-nest-api}
       - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
@@ -44,19 +44,29 @@ services:
     container_name: rd-api-distroless
     restart: unless-stopped
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-rd-nest-api}
       - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
-      - AWS_REGION=${AWS_REGION}
-      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL}
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_S3_FORCE_PATH_STYLE=true
       - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - RABBITMQ_PREFETCH=${RABBITMQ_PREFETCH}
+      - PAYMENTS_GRPC_URL=${PAYMENTS_GRPC_URL}
+      - PAYMENTS_GRPC_BIND_URL=${PAYMENTS_GRPC_BIND_URL}
+      - PAYMENTS_RPC_TIMEOUT_MS=${PAYMENTS_RPC_TIMEOUT_MS}
+      - PAYMENTS_RPC_MAX_RETRIES=${PAYMENTS_RPC_MAX_RETRIES}
+      - PAYMENTS_RPC_BACKOFF_MS=${PAYMENTS_RPC_BACKOFF_MS}
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,20 +91,29 @@ services:
     tmpfs:
       - /tmp
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-rd-nest-api}
       - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
-      - AWS_REGION=${AWS_REGION}
-      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL}
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_S3_FORCE_PATH_STYLE=true
       - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - RABBITMQ_PREFETCH=${RABBITMQ_PREFETCH}
+      - PAYMENTS_GRPC_URL=${PAYMENTS_GRPC_URL}
+      - PAYMENTS_GRPC_BIND_URL=${PAYMENTS_GRPC_BIND_URL}
+      - PAYMENTS_RPC_TIMEOUT_MS=${PAYMENTS_RPC_TIMEOUT_MS}
+      - PAYMENTS_RPC_MAX_RETRIES=${PAYMENTS_RPC_MAX_RETRIES}
+      - PAYMENTS_RPC_BACKOFF_MS=${PAYMENTS_RPC_BACKOFF_MS}
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,8 +129,8 @@ services:
     container_name: rd-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-rd-nest-api}
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -128,8 +147,8 @@ services:
     container_name: rd-minio
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
@@ -156,7 +175,7 @@ services:
       - minio
     entrypoint: >
       /bin/sh -c "
-      until mc alias set local http://minio:9000 ${AWS_ACCESS_KEY_ID:-minioadmin} ${AWS_SECRET_ACCESS_KEY:-minioadmin}; do
+      until mc alias set local http://minio:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}; do
         echo 'waiting for minio...';
         sleep 2;
       done;
@@ -175,10 +194,10 @@ services:
     command: [ "npm", "run", "db:migrate:prod" ]
     environment:
       - DB_HOST=postgres
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-rd-nest-api}
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
     depends_on:
       postgres:
         condition: service_healthy
@@ -193,10 +212,10 @@ services:
     command: [ "npm", "run", "db:seed:prod" ]
     environment:
       - DB_HOST=postgres
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-rd-nest-api}
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
     depends_on:
       - migrate
     networks:
@@ -211,5 +230,3 @@ networks:
   internal:
     internal: true
   public:
-
-

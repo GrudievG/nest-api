@@ -8,30 +8,33 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-rd-nest-api}
       - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-minioadmin}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - AWS_S3_BUCKET=${AWS_S3_BUCKET}
       - AWS_S3_ENDPOINT=http://minio:9000
       - AWS_S3_FORCE_PATH_STYLE=true
       - FILES_PRESIGN_EXPIRES_IN_SEC=${FILES_PRESIGN_EXPIRES_IN_SEC}
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - RABBITMQ_PREFETCH=${RABBITMQ_PREFETCH}
+      - PAYMENTS_GRPC_URL=${PAYMENTS_GRPC_URL}
+      - PAYMENTS_GRPC_BIND_URL=${PAYMENTS_GRPC_BIND_URL}
+      - PAYMENTS_RPC_TIMEOUT_MS=${PAYMENTS_RPC_TIMEOUT_MS}
+      - PAYMENTS_RPC_MAX_RETRIES=${PAYMENTS_RPC_MAX_RETRIES}
+      - PAYMENTS_RPC_BACKOFF_MS=${PAYMENTS_RPC_BACKOFF_MS}
+    volumes:
+      - .:/usr/src/app
+      - node_modules:/usr/src/app/node_modules
     develop:
       watch:
-        - action: sync
-          path: .
-          target: /usr/src/app
-          ignore:
-            - node_modules/
-            - dist/
-            - .git/
         - action: rebuild
           path: package.json
 
@@ -66,3 +69,6 @@ services:
       context: .
       target: dev
     command: [ "npm", "run", "db:seed" ]
+
+volumes:
+  node_modules:
