@@ -301,60 +301,107 @@ The RabbitMQ topology is tightly coupled with the database state to achieve Exac
 
 ### Environment setup:
 
-**To run main app:**
+**1. Start infrastructure (Postgres, MinIO, RabbitMQ):**
 
-1. Run the environment with `docker compose up --build`. It's possible to use `compose.local.yaml` file. It will start Postgres, Minio and RabbitMQ containers.
-2. Run migrations and seed data. (`npm run db:migrate`, `npm run db:seed`)
-3. Copy .env.example file and paste values
-4. Then start api locally using `npm run start`
+```bash
+# Option A — Docker Compose local profile (recommended)
+docker compose -f compose.yaml -f compose.local.yaml up -d
 
-**To run payments service:**
-```
-start:payments:dev
+# Option B — full stack
+docker compose up --build -d
 ```
 
-**Go through happy path:**
-Authenticate with admin credentials. Endpoint: `POST {{base_url}}/api/v1/auth/login` Request body: `{ email: 'admin@example.com', password: 'password123' }`
-Create an order
-URL: `POST {{base_url}}/api/v1/orders`
-Request body:
-```JSON
-{
+**2. Run migrations & seed:**
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
+> Seeded products are inserted with fixed UUIDs — you can get them via `GET /api/v1/products` (see below).
+
+**3. Copy environment config:**
+
+```bash
+cp .env.example .env
+# Fill in the required values (DB, MinIO, JWT secret, etc.)
+```
+
+**4. Start the main API:**
+
+```bash
+npm run start:dev
+```
+
+**5. Start the payments gRPC service (separate terminal):**
+
+```bash
+npm run start:payments:dev
+```
+
+> The payments gRPC service listens on `localhost:5021` by default (configurable via `PAYMENTS_GRPC_URL`).  
+> Proto contract: `proto/payments.proto` at the repository root — referenced automatically by both services.
+
+---
+
+### Happy path: create → pay → check status
+
+```bash
+BASE=http://localhost:4000/api/v1
+
+# 1. Authenticate
+TOKEN=$(curl -s -X POST $BASE/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"password123"}' | jq -r .accessToken)
+
+# 2. Get available product IDs
+curl -s $BASE/products -H "Authorization: Bearer $TOKEN" | jq '[.[] | {id, title, stock}]'
+
+# 3. Create an order (replace productId values with real ones from step 2)
+ORDER=$(curl -s -X POST $BASE/orders \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
     "items": [
-        {
-            "productId": "9e9272e0-6143-4c16-aac6-b65c8a354862", 
-            "quantity": 3
-        },
-        {
-            "productId": "3af2a9b6-8982-4641-9b5b-5a5e272dd3bf",
-            "quantity": 2
-        }
+      {"productId": "9e9272e0-6143-4c16-aac6-b65c8a354862", "quantity": 1},
+      {"productId": "3af2a9b6-8982-4641-9b5b-5a5e272dd3bf", "quantity": 1}
     ],
-    "idempotencyKey": "newKey"
-}
-```
-Get `id` from the response
+    "idempotencyKey": "order-key-001"
+  }')
+ORDER_ID=$(echo $ORDER | jq -r .id)
+echo "Order ID: $ORDER_ID"
 
-Make a request to pay order:
-`POST {{base_url}}/api/v1/orders/{{orderId}}/pay
-Request body:
-```JSON
-{
+# 4. Pay the order
+PAY=$(curl -s -X POST $BASE/orders/$ORDER_ID/pay \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
     "amount": "10.15",
     "currency": "USD",
-    "idempotencyKey": "newKey"
-}
+    "idempotencyKey": "pay-key-001"
+  }')
+PAYMENT_ID=$(echo $PAY | jq -r .paymentId)
+echo "Payment ID: $PAYMENT_ID"
+
+# 5. Check payment status
+curl -s $BASE/orders/payments/$PAYMENT_ID/status \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# 6. Confirm order is now PAID
+curl -s $BASE/orders/$ORDER_ID \
+  -H "Authorization: Bearer $TOKEN" | jq '{id, status}'
 ```
 
-Check paymentId in the response.
+**Expected outcomes:**
+- Step 4 → `{"paymentId":"...","status":"PAYMENT_STATUS_AUTHORIZED","message":"Payment authorized",...}`
+- Step 5 → `{"paymentId":"...","status":"PAYMENT_STATUS_AUTHORIZED","orderId":"...","providerRef":"..."}`
+- Step 6 → `{"id":"...","status":"PAID"}`
 
-Make the same request with the same request body (the same `idempotencyKey`)
+**Idempotency check:**  
+Repeat step 4 with the **same** `idempotencyKey` — you get back the same `paymentId`.  
+Repeat with a **different** `idempotencyKey` — a new authorization is returned (order is already PAID so the response is the cached payment record).
 
-Check paymentId again.
-
-Make the same request with changed `idempotencyKey`
-
-Check paymentId
+---
 
 ### Proto contract:
 Proto contract file is placed in the project root.

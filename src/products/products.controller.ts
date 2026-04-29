@@ -1,4 +1,12 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -13,6 +21,11 @@ import { AttachFileDto } from '../files/dto/attach-file.dto';
 @Controller({ path: 'products', version: '1' })
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
+
+  @Get()
+  getAll() {
+    return this.productsService.findAll();
+  }
 
   @Roles(UserRole.ADMIN, UserRole.SUPPORT)
   @Scopes('products:images:write')

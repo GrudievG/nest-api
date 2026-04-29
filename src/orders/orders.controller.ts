@@ -169,13 +169,10 @@ export class OrdersController {
       userAgent: req.headers?.['user-agent'],
     });
 
-    return this.paymentsGrpcClient.authorize({
-      orderId,
+    return this.ordersService.payOrder(orderId, {
       userId,
-      total: {
-        amount: dto.amount,
-        currency: dto.currency,
-      },
+      amount: dto.amount,
+      currency: dto.currency,
       idempotencyKey: dto.idempotencyKey ?? randomUUID(),
       paymentMethod: dto.paymentMethod,
       simulateUnavailableOnce: dto.simulateUnavailableOnce,
