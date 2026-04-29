@@ -52,6 +52,7 @@ PR → quality checks → merge to develop → build image → stage deploy → 
 | Install deps | `npm ci` | Clean install of dependencies |
 | Lint | `npm run lint` | ESLint code quality check |
 | Typecheck | `npm run typecheck` | TypeScript type validation |
+| Unit tests | `npm run test` | Run Jest unit test suite |
 | Build check | `npm run build` | Verify NestJS compiles successfully |
 | Docker build validation | `docker build -t test-build .` | Verify Dockerfile builds correctly |
 
@@ -131,7 +132,7 @@ This artifact is downloaded by both the stage and production deploy jobs to retr
 
 ### Compose File
 
-`compose.stage.yml` (on EC2 as `docker-compose.stage.yml`) defines:
+`docker-compose.stage.yml` (on EC2 as `docker-compose.stage.yml`) defines:
 - `postgres` — PostgreSQL 16 with health check
 - `rabbitmq` — RabbitMQ with management UI
 - `migrate` — runs TypeORM migrations
@@ -145,6 +146,9 @@ This artifact is downloaded by both the stage and production deploy jobs to retr
 **Job:** `deploy-prod` in `build-and-stage.yml`  
 **GitHub Environment:** `production` (with required reviewers)  
 **Trigger:** Manual approval — waits for a reviewer to approve after stage succeeds
+
+> **Why is production deploy in the same file as stage?**  
+> All three jobs (`build`, `deploy-stage`, `deploy-prod`) share the same `release-manifest.json` artifact produced by the `build` job. GitHub Actions artifacts are scoped to a single workflow run — a separate `deploy-prod.yml` file would not have access to the artifact from another workflow's run without extra complexity (e.g., storing the manifest in S3 or a separate artifact registry). Keeping all jobs in one workflow file guarantees that the exact same artifact — and therefore the exact same Docker image — flows from build through stage to production with no additional plumbing.
 
 ### Protection Mechanisms
 
@@ -183,16 +187,16 @@ This artifact is downloaded by both the stage and production deploy jobs to retr
 ## 6. Pipeline Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        PR Checks Workflow                           │
-│  trigger: pull_request → develop / main                             │
-│                                                                     │
-│  ┌──────────┐  ┌──────┐  ┌───────────┐  ┌───────┐  ┌────────────┐   │
-│  │ npm ci   │→ │ lint │→ │ typecheck │→ │ build │→ │ docker     │   │
-│  │          │  │      │  │           │  │ check │  │ build      │   │
-│  └──────────┘  └──────┘  └───────────┘  └───────┘  │ validation │   │
-│                                                    └────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        PR Checks Workflow                                    │
+│  trigger: pull_request → develop / main                                      │
+│                                                                              │
+│  ┌────────┐  ┌──────┐  ┌───────────┐  ┌───────┐  ┌───────┐  ┌────────────┐   │
+│  │ npm ci │→ │ lint │→ │ typecheck │→ │ unit  │→ │ build │→ │ docker     │   │
+│  │        │  │      │  │           │  │ tests │  │ check │  │ build      │   │
+│  └────────┘  └──────┘  └───────────┘  └───────┘  └───────┘  │ validation │   │
+│                                                             └────────────┘   │
+└──────────────────────────────────────────────────────────────────────────────┘
 
                               merge ↓
 
@@ -321,8 +325,8 @@ GitHub Actions Runner
 
 | File | Location on EC2 | Purpose |
 |---|---|---|
-| `compose.stage.yml` | `/opt/api/docker-compose.stage.yml` | Stage deployment |
-| `compose.prod.yml` | `/opt/api/docker-compose.prod.yml` | Production deployment |
+| `docker-compose.stage.yml` | `/opt/api/docker-compose.stage.yml` | Stage deployment |
+| `docker-compose.prod.yml` | `/opt/api/docker-compose.prod.yml` | Production deployment |
 
 Both are fully parameterized via environment variables — no hardcoded values. The `.env` file is generated during each deploy from GitHub Environment secrets.
 
@@ -348,7 +352,18 @@ Both are fully parameterized via environment variables — no hardcoded values. 
 |---|---|
 | `.github/workflows/pr-checks.yml` | PR quality gates (lint, typecheck, build, Docker) |
 | `.github/workflows/build-and-stage.yml` | Build + stage deploy + prod deploy workflow |
-| `compose.stage.yml` | Docker Compose for stage environment |
-| `compose.prod.yml` | Docker Compose for production environment |
+| `docker-compose.stage.yml` | Docker Compose for stage environment |
+| `docker-compose.prod.yml` | Docker Compose for production environment |
 | `Dockerfile` | Multi-stage Docker build (base → deps → build → prod) |
 
+
+## 11. Evidence of Successful Runs
+
+<img width="362" height="588" alt="Снимок экрана 2026-04-30 в 00 21 52" src="https://github.com/user-attachments/assets/dc3e2c92-602f-4488-8f07-b261acbb7f24" />
+<img width="932" height="341" alt="Снимок экрана 2026-04-30 в 00 22 31" src="https://github.com/user-attachments/assets/bebd1fa4-bff7-4fd7-af0a-d18b54787465" />
+<img width="328" height="710" alt="Снимок экрана 2026-04-30 в 00 22 50" src="https://github.com/user-attachments/assets/5b5b035d-9186-4227-a350-8572cce7fa44" />
+<img width="696" height="555" alt="Снимок экрана 2026-04-30 в 00 23 11" src="https://github.com/user-attachments/assets/74935fbf-9f9a-4492-bc9e-e1c5205c6d60" />
+<img width="764" height="259" alt="Снимок экрана 2026-04-30 в 00 23 39" 
+src="https://github.com/user-attachments/assets/c5bcba8a-1d84-4a67-8702-312ec632c5c0" />
+<img width="673" height="416" alt="Снимок экрана 2026-04-30 в 00 23 59" src="https://github.com/user-attachments/assets/346d41a0-9399-49bb-93d8-447841797b6c" />
+<img width="707" height="691" alt="Снимок экрана 2026-04-30 в 00 26 56" src="https://github.com/user-attachments/assets/a24297f3-6771-4afe-85da-b7805da5dd29" />

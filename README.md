@@ -446,6 +446,10 @@ const grpc = await NestFactory.createMicroservice<MicroserviceOptions>(
   await grpc.listen();
 ```
 
+## Homework 17 (CI/CD):
+
+Full document: [`homework17.md`](./homework17.md)
+
 ## Security Homework — Baseline Hardening
 
 Full baseline document: [`security-homework/SECURITY-BASELINE.md`](./security-homework/SECURITY-BASELINE.md)
