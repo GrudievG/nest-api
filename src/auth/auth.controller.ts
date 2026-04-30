@@ -20,7 +20,7 @@ import type { RequestWithId } from '../common/middleware/request-id.middleware';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Throttle({ strict: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   login(

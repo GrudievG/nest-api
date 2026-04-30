@@ -33,7 +33,7 @@ export class UsersController {
     private readonly auditService: AuditService,
   ) {}
 
-  @Throttle({ strict: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post()
   register(@Body() registerUserDto: RegisterUserDto) {
     return this.usersService.create(registerUserDto);
