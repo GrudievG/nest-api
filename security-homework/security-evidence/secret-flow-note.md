@@ -32,7 +32,7 @@ Used in JwtModule, TypeOrmModule, etc.
 
 **Key design decisions:**
 - `ConfigModule` is the single injection point — business logic never reads `process.env` directly.
-- `skipProcessEnv: true` is NOT set — env vars flow through, but secrets are mapped through typed config factories that allow validation and defaulting.
+- `skipProcessEnv: true` is set in `ConfigModule.forRoot` — env vars are read exclusively through the typed config factory functions (`load: [appConfig, databaseConfig, ...]`), not passed through directly. This prevents accidental `process.env` leakage across the app.
 - No secret is ever passed to a Logger call.
 
 ## What Must Never Be Logged

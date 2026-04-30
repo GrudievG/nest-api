@@ -31,18 +31,14 @@ import paymentsServiceConfig from './config/payments-service.config';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([
-      {
-        name: 'global',
-        ttl: 60000,
-        limit: 100,
-      },
-      {
-        name: 'strict',
-        ttl: 60000,
-        limit: 5,
-      },
-    ]),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 10,
+        },
+      ],
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       skipProcessEnv: true,

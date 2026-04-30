@@ -147,7 +147,7 @@ export class OrdersController {
     return { ok: true };
   }
 
-  @Throttle({ strict: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post(':orderId/pay')
   async payOrder(
     @Param('orderId', ParseUUIDPipe) orderId: string,
